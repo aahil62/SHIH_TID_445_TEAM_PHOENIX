@@ -14,12 +14,23 @@ from fraudlens.models.schemas import AgentScore, Decision, ScoringResult
 # velocity carry the anomaly signal; ml_agent learns nonlinear combinations
 # of a transaction's own static features; rules catch simple high-risk
 # patterns. Unlisted agents fall back to a 0.25 weight below.
+#
+# ml_agent's weight (0.35, matching graph_agent) is benchmarked, not
+# guessed: fraudlens/evaluation/benchmark.py shows ensemble precision/
+# recall/F1 are flat from 0.20-0.50 (the critical-signal boost below
+# already dominates threshold-level decisions), but AUC-PR rises
+# 0.9500 -> 0.9654 at 0.35 and keeps climbing past it. Not pushed
+# higher than graph_agent's weight — that would start over-concentrating
+# the ensemble on one model instead of staying genuinely multi-signal,
+# for AUC-PR gains past this point that risk overfitting to one
+# benchmark split. Re-check this if the benchmark's dataset composition
+# changes meaningfully.
 WEIGHTS: dict[str, float] = {
     "graph_agent": 0.35,
     "velocity_agent": 0.25,
     "behavioral_agent": 0.20,
     "rule_agent": 0.20,
-    "ml_agent": 0.20,
+    "ml_agent": 0.35,
 }
 
 _BLOCK_AND_REPORT_THRESHOLD = 0.80
