@@ -191,3 +191,27 @@ class FraudReport(BaseModel):
     report_status: str = "draft"
     generated_at: str = Field(default_factory=_now_iso)
     report_text: str = ""
+
+
+# ── Copilot (populated by feature/rules-velocity in Stage C) ────────────────
+
+class CopilotToolCall(BaseModel):
+    """One real backend call Copilot made while answering — the audit trail
+    that proves an answer traces back to actual data, not a guess."""
+    tool: str
+    input: dict[str, Any] = Field(default_factory=dict)
+    output: dict[str, Any] = Field(default_factory=dict)
+
+
+class CopilotRequest(BaseModel):
+    question: str
+    txn_id: Optional[str] = None
+
+
+class CopilotResponse(BaseModel):
+    answer: str
+    tool_calls: list[CopilotToolCall] = Field(default_factory=list)
+    # True whenever every fact in `answer` traces back to a `tool_calls`
+    # entry — guaranteed by construction in CopilotAgent, never asserted by
+    # the LLM itself.
+    grounded: bool = True
