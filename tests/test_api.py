@@ -78,6 +78,44 @@ class ApiTests(unittest.TestCase):
         resp = self.client.post("/decisions", json={"txn_id": txn_id, "decision": "not_a_real_decision"})
         self.assertEqual(resp.status_code, 400)
 
+    def test_case_graph_returns_real_masked_ring_for_a_ring_transaction(self) -> None:
+        # Deterministic under the fixed seed=42 synthetic dataset — a
+        # known fraud_ring-pattern transaction.
+        txn_id = "TXN-AF493E2FCD007CAD"
+        resp = self.client.get(f"/cases/{txn_id}/graph")
+        self.assertEqual(resp.status_code, 200)
+        graph = resp.json()["graph"]
+        self.assertIsNotNone(graph)
+        self.assertGreaterEqual(graph["ring_size"], 2)
+        account_nodes = [n for n in graph["nodes"] if n["node_type"] == "account"]
+        self.assertEqual(len(account_nodes), graph["ring_size"])
+        self.assertGreater(len(graph["edges"]), 0)
+
+        # Every account/device/merchant label must be masked; every ip
+        # label must be masked; no node id may look like a raw identifier.
+        for node in graph["nodes"]:
+            if node["node_type"] in ("account", "device", "merchant"):
+                self.assertIn("••", node["label"])
+            if node["node_type"] == "ip":
+                self.assertIn("••", node["label"])
+
+        self.assertIsNotNone(graph["flagged_node_id"])
+        node_ids = {n["id"] for n in graph["nodes"]}
+        self.assertIn(graph["flagged_node_id"], node_ids)
+        for edge in graph["edges"]:
+            self.assertIn(edge["source"], node_ids)
+            self.assertIn(edge["target"], node_ids)
+
+    def test_case_graph_is_null_for_a_non_ring_transaction(self) -> None:
+        txn_id = "TXN-E3A14F5D6ED5855D"  # deterministic normal-pattern transaction
+        resp = self.client.get(f"/cases/{txn_id}/graph")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.json()["graph"])
+
+    def test_case_graph_404_for_unknown_txn(self) -> None:
+        resp = self.client.get("/cases/TXN-DOES-NOT-EXIST/graph")
+        self.assertEqual(resp.status_code, 404)
+
     def test_copilot_chat_without_api_key_returns_503_not_a_guess(self) -> None:
         # No GROQ_API_KEY in the test environment — the route must refuse
         # cleanly rather than silently answering without an LLM behind it.
