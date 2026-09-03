@@ -40,6 +40,10 @@ class Transaction(BaseModel):
     timestamp: str
     location: str = ""
     channel: str = "online"
+    # Ground truth from the synthetic generator — never used by scoring
+    # agents at inference time, only for benchmarking and demo labeling.
+    is_fraud_demo_label: bool = False
+    fraud_pattern_type: str = "normal"
 
 
 # ── Scoring ───────────────────────────────────────────────────────────────
