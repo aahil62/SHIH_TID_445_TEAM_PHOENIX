@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  --canvas: #f4f6f9;
+  --panel: #ffffff;
+  --foreground: #1a2130;
+  --muted: #5b6473;
+  --border: #dfe4ec;
+
+  --graphite: #232936;
+  --graphite-foreground: #c6cbd6;
+
+  --cobalt: #2954e0;
+  --cobalt-foreground: #ffffff;
+
+  --risk-low: #1f8a4c;
+  --risk-low-bg: #e7f6ec;
+  --risk-medium: #b5750a;
+  --risk-medium-bg: #fbf0dd;
+  --risk-high: #c23b22;
+  --risk-high-bg: #fcebe7;
+  --risk-critical: #9c1c1c;
+  --risk-critical-bg: #fbe2e2;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+
+  --color-graphite: var(--graphite);
+  --color-graphite-foreground: var(--graphite-foreground);
+
+  --color-cobalt: var(--cobalt);
+  --color-cobalt-foreground: var(--cobalt-foreground);
+
+  --color-risk-low: var(--risk-low);
+  --color-risk-low-bg: var(--risk-low-bg);
+  --color-risk-medium: var(--risk-medium);
+  --color-risk-medium-bg: var(--risk-medium-bg);
+  --color-risk-high: var(--risk-high);
+  --color-risk-high-bg: var(--risk-high-bg);
+  --color-risk-critical: var(--risk-critical);
+  --color-risk-critical-bg: var(--risk-critical-bg);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
