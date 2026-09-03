@@ -1,17 +1,19 @@
 """Transaction graph construction and ring detection for FraudLens.
 
 Builds an account/device/ip/merchant graph from raw transactions and
-supports BFS subgraph extraction with connected-component ring detection
-over shared device/IP edges. Consumed by GraphAgent and, via
-get_graph_evidence(), by CaseEngine and the Fraud DNA extractor.
+supports BFS subgraph extraction with Louvain community-detection ring
+membership over shared device/IP edges (see core/graph/community.py).
+Consumed by GraphAgent and, via get_graph_evidence(), by CaseEngine and
+the Fraud DNA extractor.
 """
 
 from __future__ import annotations
 
 import hashlib
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Optional
 
+from fraudlens.core.graph.community import detect_communities
 from fraudlens.models.schemas import FraudGraph, GraphEdge, GraphEvidence, GraphNode, Transaction
 
 NODE_ACCOUNT = "account"
@@ -93,9 +95,9 @@ class GraphBuilder:
 
     def get_subgraph(self, txn_id: str, depth: int = 2) -> FraudGraph:
         """BFS out `depth` hops from the transaction's account node, then
-        detect a fraud ring via connected components over shared
-        device/IP edges among the accounts reached (2+ connected
-        accounts = a ring)."""
+        detect a fraud ring via Louvain community detection over shared
+        device/IP connections among the accounts reached (2+ accounts in
+        the transaction's own community = a ring)."""
         if not self._built:
             raise ValueError("GraphBuilder.build() must be called before get_subgraph()")
         txn = self._txn_by_id.get(txn_id)
@@ -191,37 +193,35 @@ class GraphBuilder:
         start: str, visited: set[str], edges: list[GraphEdge]
     ) -> tuple[Optional[str], int]:
         account_ids = {n for n in visited if n.startswith(f"{NODE_ACCOUNT}:")}
-        parent: dict[str, str] = {a: a for a in account_ids}
+        if start not in account_ids:
+            return None, 0
 
-        def find(x: str) -> str:
-            while parent[x] != x:
-                parent[x] = parent[parent[x]]
-                x = parent[x]
-            return x
-
-        def union(a: str, b: str) -> None:
-            ra, rb = find(a), find(b)
-            if ra != rb:
-                parent[ra] = rb
-
-        # Two accounts are ring-connected if they share a device or IP node.
+        # Two accounts are ring-connected if they share a device or IP
+        # node; the *number* of devices/IPs two accounts share becomes the
+        # projected edge weight, so Louvain can tell a strong bridge
+        # (several shared devices) from a weak one (a single shared IP) —
+        # a plain connected-components walk can't make that distinction.
         shared_via: dict[str, list[str]] = defaultdict(list)
         for e in edges:
             if e.edge_type in _SHARED_EDGE_TYPES and e.source in account_ids:
                 shared_via[e.target].append(e.source)
 
+        projection_weights: Counter[tuple[str, str]] = Counter()
         for accounts_sharing in shared_via.values():
-            for i in range(1, len(accounts_sharing)):
-                union(accounts_sharing[0], accounts_sharing[i])
+            unique_accounts = sorted(set(accounts_sharing))
+            for i in range(len(unique_accounts)):
+                for j in range(i + 1, len(unique_accounts)):
+                    projection_weights[(unique_accounts[i], unique_accounts[j])] += 1
 
-        if start not in parent:
+        communities = detect_communities(
+            edges=[(a, b, float(w)) for (a, b), w in projection_weights.items()],
+            nodes=account_ids,
+        )
+
+        community = next((c for c in communities if start in c), None)
+        if community is None or len(community) < 2:
             return None, 0
 
-        root = find(start)
-        component = [a for a in account_ids if find(a) == root]
-        if len(component) < 2:
-            return None, 0
-
-        ring_members = sorted(a.split(":", 1)[1] for a in component)
+        ring_members = sorted(a.split(":", 1)[1] for a in community)
         ring_id = "RING-" + hashlib.sha1("|".join(ring_members).encode()).hexdigest()[:8]
-        return ring_id, len(component)
+        return ring_id, len(community)
