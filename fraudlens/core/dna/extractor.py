@@ -42,13 +42,13 @@ def _heuristic_fraud_type(ring_size: int, avg_amount: float, velocity_score: flo
     refines this against the known-pattern library, but a query profile
     needs a non-empty fraud_type/modus_operandi of its own regardless of
     whether a confident library match is found."""
-    if velocity_score >= 0.7 and avg_amount < 20:
+    if velocity_score >= 0.7 and avg_amount < 1_500:
         return "card_testing_ring"
     if graph_density >= 0.6 and ring_size >= 6:
         return "device_farm_fraud"
-    if avg_amount >= 1000 and velocity_score >= 0.4:
+    if avg_amount >= 80_000 and velocity_score >= 0.4:
         return "bust_out_ring"
-    if ring_size <= 3 and avg_amount >= 500:
+    if ring_size <= 3 and avg_amount >= 40_000:
         return "account_takeover_cluster"
     return "unclassified_ring"
 
@@ -78,7 +78,7 @@ class FraudDNAExtractor:
         )
         modus_operandi = (
             f"{evidence.ring_size} accounts sharing {len(evidence.shared_devices)} device(s) "
-            f"and {len(evidence.shared_ips)} IP(s); avg transaction ${avg_amount:,.2f}, "
+            f"and {len(evidence.shared_ips)} IP(s); avg transaction ₹{avg_amount:,.2f}, "
             f"velocity score {velocity_score:.2f}, graph density {evidence.graph_density:.2f}."
         )
         ring_id = evidence.ring_id or f"RING-UNKNOWN-{ring_transactions[0].txn_id}"

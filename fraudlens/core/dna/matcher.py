@@ -1,7 +1,7 @@
 """Fraud DNA matcher for FraudLens.
 
 Similarity search over the known-pattern library: normalizes each
-profile's numeric features onto comparable [0, 1] scales (raw dollar
+profile's numeric features onto comparable [0, 1] scales (raw rupee
 amounts would otherwise dominate a plain distance metric) and returns the
 closest library profile, or None if nothing clears the confidence
 threshold.
@@ -17,10 +17,13 @@ from fraudlens.models.schemas import FraudDNAMatch, FraudDNAProfile
 _DEFAULT_SIMILARITY_THRESHOLD = 0.55
 
 # Log-scale references so avg/max amounts read as increasingly similar the
-# further apart they get, rather than a linear scale where a $50 gap near
-# zero counts the same as a $50 gap near $10,000.
-_AMOUNT_LOG_SCALE = math.log1p(5000.0)
-_MAX_AMOUNT_LOG_SCALE = math.log1p(10000.0)
+# further apart they get, rather than a linear scale where a ₹4,000 gap
+# near zero counts the same as a ₹4,000 gap near ₹8,00,000. Scaled to the
+# same INR magnitude as the seed profiles in store.py and the thresholds
+# in rule_agent.py/velocity_agent.py — these three must move together, or
+# a ring's amounts and the library's amounts stop being comparable.
+_AMOUNT_LOG_SCALE = math.log1p(400_000.0)
+_MAX_AMOUNT_LOG_SCALE = math.log1p(800_000.0)
 _RING_SIZE_SCALE = 10.0
 _CATEGORY_COUNT_SCALE = 5.0
 
