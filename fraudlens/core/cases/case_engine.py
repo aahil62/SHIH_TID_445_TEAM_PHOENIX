@@ -1,12 +1,18 @@
 """Case engine — orchestrates registered agents into a FraudCase.
 
-Stage A scope: run whatever ScoringAgents are registered, combine them via
-the ensemble, and assemble a case. Stage B fills in the two extension
-points below: _build_graph_evidence delegates to GraphBuilder's own
-get_graph_evidence(), and _run_dna_analysis feeds the ring's transactions
-through FraudDNAExtractor and FraudDNAMatcher. Both stay None for a
-transaction with no detected ring — this class's shape doesn't change,
-only those two methods do.
+Fraud DNA is computed *before* the ensemble runs, not after: graph
+evidence (ring detection) is the only real gate for whether Fraud DNA
+applies at all, so it's built unconditionally first, then
+fraud_dna_agent's score is combined into the *same* ensemble.combine()
+call as the five direct-scoring agents. That's what makes a confirmed
+historical match actually move the decision, instead of only appending
+text to a decision the other five agents already finalized.
+
+confirm_fraud_dna() closes the loop the other direction: when an analyst
+confirms a ring-linked case as real fraud, its profile is added to the
+library so the *next* similar ring — under different accounts — matches
+against it. The library starts with 5 seed typologies and gets no
+smarter than that until real confirmed cases start feeding back in.
 """
 
 from __future__ import annotations
@@ -14,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 
+from fraudlens.core.dna.agent import score_fraud_dna
 from fraudlens.core.dna.extractor import FraudDNAExtractor
 from fraudlens.core.dna.matcher import FraudDNAMatcher
 from fraudlens.core.dna.store import FraudDNAStore
@@ -24,6 +31,7 @@ from fraudlens.models.schemas import (
     Decision,
     FraudCase,
     FraudDNAMatch,
+    FraudDNAProfile,
     GraphEvidence,
     Transaction,
 )
@@ -65,7 +73,8 @@ class CaseEngine:
         self._graph_builder = graph_builder or GraphBuilder()
         self._graph_builder.build(transactions)
         self._dna_extractor = FraudDNAExtractor()
-        self._dna_matcher = dna_matcher or FraudDNAMatcher(dna_store or FraudDNAStore())
+        self._dna_store = dna_store or FraudDNAStore()
+        self._dna_matcher = dna_matcher or FraudDNAMatcher(self._dna_store)
 
     def analyze(self, txn_id: str) -> FraudCase:
         """Full pipeline for one transaction: score, evaluate, persist."""
@@ -73,13 +82,16 @@ class CaseEngine:
         if txn is None:
             raise ValueError(f"Transaction {txn_id} not found")
 
-        agent_scores = [agent.score(txn) for agent in self._agents]
-        result = self._ensemble.combine(agent_scores)
-
+        # Graph evidence first and unconditionally — ring presence is the
+        # only real gate for Fraud DNA, not the other agents' score.
         graph_evidence = self._build_graph_evidence(txn_id)
-        fraud_dna_match: FraudDNAMatch | None = None
-        if result.final_score >= 0.30:
-            fraud_dna_match = self._run_dna_analysis(txn_id)
+        ring_txns = self._ring_transactions(graph_evidence)
+        dna_agent_score, fraud_dna_match = score_fraud_dna(
+            graph_evidence, ring_txns, self._dna_extractor, self._dna_matcher,
+        )
+
+        agent_scores = [agent.score(txn) for agent in self._agents] + [dna_agent_score]
+        result = self._ensemble.combine(agent_scores)
 
         case = FraudCase(
             case_id=f"CASE-{txn_id}",
@@ -98,6 +110,34 @@ class CaseEngine:
         self._persist_cases()
         return case
 
+    def confirm_fraud_dna(self, txn_id: str) -> FraudDNAProfile | None:
+        """Add a ring-linked case's profile to the Fraud DNA library.
+
+        Call this when an analyst confirms a case as real fraud (see
+        api/routes/decisions.py) — not automatically on every engine
+        decision, so the library only grows from validated cases, not raw
+        unconfirmed alerts. Idempotent: re-confirming the same ring is a
+        no-op. Returns None if the case has no detected ring to fingerprint.
+        """
+        case = self.get_case_by_txn(txn_id)
+        if case is None or case.graph_evidence is None:
+            return None
+
+        confirmed_id = f"CONFIRMED-{case.graph_evidence.ring_id or txn_id}"
+        existing = self._dna_store.get(confirmed_id)
+        if existing is not None:
+            return existing
+
+        ring_txns = self._ring_transactions(case.graph_evidence)
+        if not ring_txns:
+            return None
+
+        profile = self._dna_extractor.extract_profile(ring_txns, case.graph_evidence)
+        profile.ring_id = confirmed_id
+        profile.description = f"Analyst-confirmed fraud from {txn_id}: {profile.description}"
+        self._dna_store.add(profile)
+        return profile
+
     def get_case(self, case_id: str) -> FraudCase | None:
         return self._cases.get(case_id)
 
@@ -115,16 +155,11 @@ class CaseEngine:
         except ValueError:
             return None
 
-    def _run_dna_analysis(self, txn_id: str) -> FraudDNAMatch | None:
-        evidence = self._build_graph_evidence(txn_id)
+    def _ring_transactions(self, evidence: GraphEvidence | None) -> list[Transaction]:
         if evidence is None:
-            return None
+            return []
         ring_accounts = set(evidence.connected_accounts)
-        ring_txns = [t for t in self._txn_map.values() if t.account_id in ring_accounts]
-        if not ring_txns:
-            return None
-        profile = self._dna_extractor.extract_profile(ring_txns, evidence)
-        return self._dna_matcher.match(profile)
+        return [t for t in self._txn_map.values() if t.account_id in ring_accounts]
 
     # ── Recommendations ──────────────────────────────────────────────
 

@@ -59,11 +59,15 @@ class CaseEngineTests(unittest.TestCase):
 
         self.assertEqual(case.txn_id, txn.txn_id)
         self.assertEqual(case.case_id, f"CASE-{txn.txn_id}")
-        self.assertEqual(len(case.agent_scores), 4)
+        # 4 fake agents + fraud_dna_agent, which abstains here (single-txn
+        # dataset, no ring possible) but is still always present.
+        self.assertEqual(len(case.agent_scores), 5)
+        dna_score = next(a for a in case.agent_scores if a.agent_name == "fraud_dna_agent")
+        self.assertEqual(dna_score.confidence, 0.0)
         self.assertGreater(case.final_score, 0.0)
         self.assertNotEqual(case.decision, Decision.CLEAR)
         self.assertTrue(case.recommended_action)
-        # graph_evidence / fraud_dna_match are None until Stage B lands
+        # No ring in this single-transaction fixture, so no evidence/match
         self.assertIsNone(case.graph_evidence)
         self.assertIsNone(case.fraud_dna_match)
 
@@ -99,7 +103,11 @@ class CaseEngineTests(unittest.TestCase):
         case = engine.analyze(txn.txn_id)
 
         self.assertEqual(case.decision, Decision.CLEAR)
-        self.assertEqual(case.agent_scores, [])
+        # fraud_dna_agent is always present, even with zero other agents —
+        # it just abstains (no ring in this single-transaction fixture).
+        self.assertEqual(len(case.agent_scores), 1)
+        self.assertEqual(case.agent_scores[0].agent_name, "fraud_dna_agent")
+        self.assertEqual(case.agent_scores[0].confidence, 0.0)
 
 
 if __name__ == "__main__":
