@@ -1,4 +1,6 @@
+import os
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -75,6 +77,14 @@ class ApiTests(unittest.TestCase):
         self.client.get(f"/cases/{txn_id}")
         resp = self.client.post("/decisions", json={"txn_id": txn_id, "decision": "not_a_real_decision"})
         self.assertEqual(resp.status_code, 400)
+
+    def test_copilot_chat_without_api_key_returns_503_not_a_guess(self) -> None:
+        # No GROQ_API_KEY in the test environment — the route must refuse
+        # cleanly rather than silently answering without an LLM behind it.
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GROQ_API_KEY", None)
+            resp = self.client.post("/copilot/chat", json={"question": "why was this flagged?"})
+        self.assertEqual(resp.status_code, 503)
 
 
 if __name__ == "__main__":
