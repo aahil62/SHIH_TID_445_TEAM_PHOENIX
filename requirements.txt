@@ -3,3 +3,4 @@
 # Each branch adds its own deps here as it lands (fastapi, networkx, scikit-learn, ...).
 
 pydantic>=2.11
+scikit-learn>=1.3
