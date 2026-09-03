@@ -11,14 +11,15 @@ from __future__ import annotations
 from fraudlens.models.schemas import AgentScore, Decision, ScoringResult
 
 # Graph evidence is the strongest fraud-ring signal; behavioral and
-# velocity carry the anomaly signal; rules catch simple high-risk patterns.
-# feature/rules-velocity adds "ml_agent" here in Stage B once it exists —
-# unlisted agents fall back to a 0.25 weight below.
+# velocity carry the anomaly signal; ml_agent learns nonlinear combinations
+# of a transaction's own static features; rules catch simple high-risk
+# patterns. Unlisted agents fall back to a 0.25 weight below.
 WEIGHTS: dict[str, float] = {
     "graph_agent": 0.35,
     "velocity_agent": 0.25,
     "behavioral_agent": 0.20,
     "rule_agent": 0.20,
+    "ml_agent": 0.20,
 }
 
 _BLOCK_AND_REPORT_THRESHOLD = 0.80
