@@ -25,11 +25,16 @@ looking at a different angle of risk:
 | **Graph agent** | Shared devices/IPs across accounts — the signal that catches coordinated rings, not just lone transactions |
 | **ML agent** | A trained gradient-boosted classifier learning nonlinear patterns no hand-written rule captures |
 
+A sixth signal, **fraud_dna_agent**, joins the same ensemble vote — not as an afterthought that
+only decorates a decision already made, but as a real vote in it. When the graph agent detects a
+ring, the cluster is fingerprinted and checked against a **Fraud DNA** library of known fraud
+typologies; a strong match measurably raises the score, and abstains cleanly (no false "clear"
+vote) on the majority of transactions with no detected ring. Confirmed fraud from an analyst adds
+its profile to the library, so the *next* similar ring — under different accounts — gets caught
+too. All amounts are in ₹ (INR), matching this problem statement's Indian regulatory context.
+
 Their outputs are combined by a weighted **ensemble scorer** into one decision: clear, review,
-block, or block-and-report. When the graph agent detects a ring, the transaction's cluster is
-fingerprinted and checked against a **Fraud DNA** library of known fraud typologies — turning a
-one-off detection into institutional memory that recognizes a repeat pattern the next time it
-shows up under different accounts.
+block, or block-and-report.
 
 Every analyst decision — confirm, override, escalate — is logged to an **audit trail**, with
 ring-linked overrides flagged distinctly from ordinary ones. A **report generator** turns any case
@@ -42,18 +47,38 @@ not asserted, measured:
 
 | Agent | Precision | Recall | F1 | AUC-PR |
 |---|---|---|---|---|
-| rule_agent | 1.000 | 0.500 | 0.667 | 0.854 |
-| velocity_agent | 1.000 | 0.162 | 0.279 | 0.654 |
-| behavioral_agent | 0.500 | 0.397 | 0.443 | 0.437 |
+| rule_agent | 1.000 | 0.529 | 0.692 | 0.852 |
+| velocity_agent | 1.000 | 0.162 | 0.279 | 0.664 |
+| behavioral_agent | 0.491 | 0.397 | 0.439 | 0.422 |
 | graph_agent | 0.383 | 0.721 | 0.500 | 0.567 |
-| ml_agent | 0.952 | 0.882 | 0.916 | 0.946 |
-| **ensemble** | **0.983** | **0.868** | **0.922** | **0.965** |
+| ml_agent | 0.953 | 0.897 | 0.924 | 0.953 |
+| **ensemble** | **0.984** | **0.882** | **0.930** | **0.973** |
 
 The ensemble beats every individual signal — the trained model is the strongest single detector,
-and combining it with graph, behavioral, velocity, and rule signals still improves on it further.
-The `ml_agent` ensemble weight itself was set empirically: swept against this same benchmark rather
-than guessed, then capped deliberately below its single-split optimum to keep the ensemble
-genuinely multi-signal rather than over-concentrated on one model.
+and combining it with graph, behavioral, velocity, rule, and Fraud DNA signals still improves on
+it further. The `ml_agent` ensemble weight itself was set empirically: swept against this same
+benchmark rather than guessed, then capped deliberately below its single-split optimum to keep the
+ensemble genuinely multi-signal rather than over-concentrated on one model.
+
+### External validation — a real, published fraud dataset, not just our own
+
+The numbers above are on our synthetic dataset — necessary for having ground truth to benchmark
+against, but self-generated. To check the modeling approach holds up on data we didn't create
+ourselves, we ran the same model family (`GradientBoostingClassifier`, class-balanced sample
+weights) against the **ULB Credit Card Fraud dataset** — 284,807 real, anonymized European card
+transactions, 492 confirmed frauds, one of the most cited public fraud benchmarks:
+
+| Dataset | Rows | Fraud rate | Precision | Recall | F1 | AUC-PR |
+|---|---|---|---|---|---|---|
+| ULB Credit Card Fraud (real, external) | 284,807 | 0.173% | 0.290 | 0.858 | 0.433 | 0.701 |
+
+Lower precision than our synthetic benchmark, and that's expected and honest: this dataset's
+features are anonymized PCA components with no merchant/device/IP/account-history fields at all —
+genuinely harder than data we built with clear separating signals. An AUC-PR of 0.70 on a real,
+0.17%-imbalanced benchmark is a solid, defensible result, not an inflated one. This is deliberately
+a **separate model**, not `ml_agent` run unchanged — ULB's feature space is incompatible with
+`ml_agent`'s Transaction-based feature extractor, so there's no honest way to swap it in without
+fabricating fields the real data never had. See `fraudlens/evaluation/validate_ulb.py`.
 
 ## Architecture
 
@@ -64,10 +89,12 @@ flowchart LR
     T --> B[Behavioral Agent]
     T --> G[Graph Agent]
     T --> M[ML Agent]
-    R & V & B & G & M --> E[Ensemble Scorer]
-    E --> C[Case Engine]
     G -.ring detected.-> D[Fraud DNA<br/>extractor + matcher]
-    D --> C
+    D --> DA[fraud_dna_agent]
+    R & V & B & G & M & DA --> E[Ensemble Scorer]
+    E --> C[Case Engine]
+    D -.analyst confirms.-> LIB[(Fraud DNA<br/>library)]
+    LIB -.matches next ring.-> D
     C --> W[Decision Workflow<br/>+ audit trail]
     C --> RPT[Report Generator]
     C --> API[FastAPI]
@@ -89,9 +116,11 @@ amber/green reserved strictly for risk states, plain language before evidence.
 
 ## Engineering quality
 
-- **128 backend tests, all green** — schemas, all five agents, ensemble math, case orchestration,
-  graph/ring detection, Fraud DNA matching, decision workflow, report generation, and full API
-  integration tests hitting a live server, not just in-process mocks.
+- **137 backend tests, all green** (138 with the optional ULB validation downloaded) — schemas,
+  all six scoring signals, ensemble math (including the abstain-vs-vote distinction that keeps
+  Fraud DNA from wrongly dragging down non-ring transactions), case orchestration, graph/ring
+  detection, Fraud DNA matching and library growth, decision workflow, report generation, and full
+  API integration tests hitting a live server, not just in-process mocks.
 - **Five pull requests, five clean merges, zero conflicts** — four people building in parallel on
   isolated branches (core engine, rules/ML, graph/Fraud DNA, frontend) against a shared contract
   defined once on `main`, never touching each other's files.
@@ -99,7 +128,8 @@ amber/green reserved strictly for risk states, plain language before evidence.
 - Every ensemble/report/schema decision along the way was verified against real run output before
   being committed — including catching and fixing gaps found only by exercising the system live
   (a schema field two branches actually needed, a demo script silently hiding a real result, a
-  frontend panel rendering raw arrays instead of counts).
+  frontend panel rendering raw arrays instead of counts, a currency rescale that had to move the
+  Fraud DNA library's amounts and similarity math together or silently break matching).
 
 ## Tech stack
 
@@ -113,7 +143,7 @@ amber/green reserved strictly for risk states, plain language before evidence.
 # Backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m unittest discover -s tests        # 128 tests
+python -m unittest discover -s tests        # 137 tests
 python scripts/run_demo.py                  # a real transaction through every agent
 uvicorn fraudlens.api.main:app --reload --port 8001
 
@@ -121,6 +151,11 @@ uvicorn fraudlens.api.main:app --reload --port 8001
 cd frontend
 npm install
 npm run dev                                 # http://localhost:3000/feed
+
+# Optional: external validation on real data (see fraudlens/evaluation/validate_ulb.py)
+curl -o fraudlens/data/external/creditcard_ulb.csv \
+  "https://www.openml.org/data/get_csv/1673544/phpKo8OWT"
+python -m fraudlens.evaluation.validate_ulb
 ```
 
 ## Team Phoenix

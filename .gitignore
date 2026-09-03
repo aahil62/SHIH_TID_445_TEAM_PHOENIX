@@ -14,6 +14,10 @@ frontend/out/
 fraudlens/data/*.json
 !fraudlens/data/.gitkeep
 
+# Third-party datasets — large, third-party licensed; download via
+# fraudlens/evaluation/validate_ulb.py's docstring instructions, never commit.
+fraudlens/data/external/
+
 # Editor / OS
 .DS_Store
 .vscode/
