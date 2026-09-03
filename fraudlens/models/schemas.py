@@ -181,10 +181,13 @@ class FraudReport(BaseModel):
     decision: str
     engine_recommendation: str
     analyst_decision: Optional[str] = None
+    analyst: Optional[str] = None
+    analyst_notes: Optional[str] = None
     confidence: float
     agent_scores: list[AgentScore]
     graph_evidence: Optional[GraphEvidence] = None
     fraud_dna_match: Optional[FraudDNAMatch] = None
     recommended_action: str
+    report_status: str = "draft"
     generated_at: str = Field(default_factory=_now_iso)
     report_text: str = ""
