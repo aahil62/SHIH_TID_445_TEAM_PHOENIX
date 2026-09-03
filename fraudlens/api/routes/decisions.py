@@ -34,6 +34,14 @@ def submit_decision(payload: DecisionRequest) -> dict:
         )
     except DecisionWorkflowError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+    # An analyst confirming block/block_and_report on a ring-linked case is
+    # validated fraud — grow the Fraud DNA library from it. Unconfirmed
+    # engine-only detections never feed the library; only analyst-reviewed
+    # ones do, so it doesn't fill up with unreviewed false positives.
+    if payload.decision in ("block", "block_and_report"):
+        runtime.engine.confirm_fraud_dna(payload.txn_id)
+
     return record.model_dump()
 
 
