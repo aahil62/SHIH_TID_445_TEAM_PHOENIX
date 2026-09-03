@@ -33,12 +33,12 @@ export interface AgentScore {
 }
 
 export interface GraphEvidence {
-  connected_accounts: number;
-  shared_devices: number;
-  shared_ips: number;
-  shared_merchants: number;
+  connected_accounts: string[];
+  shared_devices: string[];
+  shared_ips: string[];
+  shared_merchants: string[];
   ring_size: number;
-  ring_id: string;
+  ring_id: string | null;
   suspicious_cluster: boolean;
   graph_density: number;
   evidence_summary: string;

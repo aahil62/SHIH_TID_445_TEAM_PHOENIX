@@ -131,19 +131,19 @@ export default async function CasePage({
               </div>
               <div>
                 <dt style={{ color: "var(--muted)" }}>Connected accounts</dt>
-                <dd className="font-mono">{graph_evidence.connected_accounts}</dd>
+                <dd className="font-mono">{graph_evidence.connected_accounts.length}</dd>
               </div>
               <div>
                 <dt style={{ color: "var(--muted)" }}>Shared devices</dt>
-                <dd className="font-mono">{graph_evidence.shared_devices}</dd>
+                <dd className="font-mono">{graph_evidence.shared_devices.length}</dd>
               </div>
               <div>
                 <dt style={{ color: "var(--muted)" }}>Shared IPs</dt>
-                <dd className="font-mono">{graph_evidence.shared_ips}</dd>
+                <dd className="font-mono">{graph_evidence.shared_ips.length}</dd>
               </div>
               <div>
                 <dt style={{ color: "var(--muted)" }}>Shared merchants</dt>
-                <dd className="font-mono">{graph_evidence.shared_merchants}</dd>
+                <dd className="font-mono">{graph_evidence.shared_merchants.length}</dd>
               </div>
               <div>
                 <dt style={{ color: "var(--muted)" }}>Graph density</dt>
@@ -155,7 +155,7 @@ export default async function CasePage({
                 className="mt-3 rounded px-2 py-1 text-xs font-medium"
                 style={{ color: "var(--risk-high)", backgroundColor: "var(--risk-high-bg)" }}
               >
-                Flagged as part of a suspicious cluster · ring {graph_evidence.ring_id}
+                Flagged as part of a suspicious cluster · ring {graph_evidence.ring_id ?? "unknown"}
               </p>
             )}
           </Panel>
