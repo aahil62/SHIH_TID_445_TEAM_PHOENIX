@@ -3,7 +3,7 @@ import { getCase } from "@/lib/api";
 import DecisionBadge from "@/components/DecisionBadge";
 import DecisionForm from "@/components/DecisionForm";
 import Panel from "@/components/Panel";
-import { formatAmount, formatScore, formatTimestamp } from "@/lib/risk";
+import { formatAmount, formatScore, formatTimestamp, DECISION_TONE } from "@/lib/risk";
 import { plainReason } from "@/lib/reasons";
 
 export default async function CasePage({
@@ -40,11 +40,16 @@ export default async function CasePage({
   }
 
   const { transaction, agent_scores, graph_evidence, fraud_dna_match } = caseDetail;
+  const tone = DECISION_TONE[caseDetail.decision];
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-6">
-      <div className="mb-4 flex items-center justify-between">
-        <Link href="/feed" className="text-xs underline" style={{ color: "var(--cobalt)" }}>
+      <div className="mb-5 flex items-center justify-between">
+        <Link
+          href="/feed"
+          className="rounded-sm text-xs font-medium underline underline-offset-2"
+          style={{ color: "var(--cobalt)" }}
+        >
           ← Back to alert feed
         </Link>
         <span className="font-mono text-xs" style={{ color: "var(--muted)" }}>
@@ -54,18 +59,19 @@ export default async function CasePage({
 
       <div className="flex flex-col gap-4">
         {/* Plain-language summary, leads with recommended action + confidence */}
-        <Panel title="Recommendation">
-          <div className="flex items-center gap-2">
+        <Panel title="Recommendation" accent={tone.fg} raised>
+          <div className="flex items-center gap-2.5">
             <DecisionBadge decision={caseDetail.decision} />
             <span className="font-mono text-xs" style={{ color: "var(--muted)" }}>
-              {formatScore(caseDetail.confidence)} confidence · risk score {formatScore(caseDetail.final_score)}
+              {formatScore(caseDetail.confidence)} confidence · risk score{" "}
+              {formatScore(caseDetail.final_score)}
             </span>
           </div>
-          <p className="mt-3 text-sm" style={{ color: "var(--foreground)" }}>
+          <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
             {caseDetail.recommended_action}
           </p>
 
-          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
+          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs sm:grid-cols-3">
             <div>
               <dt style={{ color: "var(--muted)" }}>Amount</dt>
               <dd className="font-mono">{formatAmount(transaction.amount)}</dd>
@@ -121,10 +127,10 @@ export default async function CasePage({
         {/* Graph evidence, only when present */}
         {graph_evidence && (
           <Panel title="Graph evidence">
-            <p className="mb-3 text-sm" style={{ color: "var(--foreground)" }}>
+            <p className="mb-3 text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
               {graph_evidence.evidence_summary}
             </p>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs sm:grid-cols-3">
               <div>
                 <dt style={{ color: "var(--muted)" }}>Ring size</dt>
                 <dd className="font-mono">{graph_evidence.ring_size}</dd>
@@ -152,9 +158,13 @@ export default async function CasePage({
             </dl>
             {graph_evidence.suspicious_cluster && (
               <p
-                className="mt-3 rounded px-2 py-1 text-xs font-medium"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-semibold"
                 style={{ color: "var(--risk-high)", backgroundColor: "var(--risk-high-bg)" }}
               >
+                <span
+                  className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current"
+                  aria-hidden="true"
+                />
                 Flagged as part of a suspicious cluster · ring {graph_evidence.ring_id ?? "unknown"}
               </p>
             )}
@@ -173,7 +183,7 @@ export default async function CasePage({
                 {fraud_dna_match.matched_ring_id}
               </span>
             </div>
-            <p className="text-sm" style={{ color: "var(--foreground)" }}>
+            <p className="text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
               {fraud_dna_match.description}
             </p>
             <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
