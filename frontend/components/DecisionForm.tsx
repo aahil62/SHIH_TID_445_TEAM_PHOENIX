@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitDecision } from "@/lib/api";
 import type { Decision } from "@/lib/types";
-import { DECISION_LABEL } from "@/lib/risk";
+import { DECISION_LABEL, DECISION_TONE } from "@/lib/risk";
 
 const OPTIONS: Decision[] = ["clear", "review", "block", "block_and_report"];
 
@@ -38,21 +38,25 @@ export default function DecisionForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
-        {OPTIONS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => setSelected(option)}
-            className="rounded border px-3 py-1.5 text-sm font-medium transition-colors"
-            style={{
-              borderColor: selected === option ? "var(--cobalt)" : "var(--border)",
-              backgroundColor: selected === option ? "var(--cobalt)" : "var(--panel)",
-              color: selected === option ? "var(--cobalt-foreground)" : "var(--foreground)",
-            }}
-          >
-            {DECISION_LABEL[option]}
-          </button>
-        ))}
+        {OPTIONS.map((option) => {
+          const isSelected = selected === option;
+          const tone = DECISION_TONE[option];
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setSelected(option)}
+              className="rounded-[var(--radius-control)] border px-3 py-1.5 text-sm font-medium transition-colors"
+              style={{
+                borderColor: isSelected ? tone.fg : "var(--border)",
+                backgroundColor: isSelected ? tone.bg : "var(--panel)",
+                color: isSelected ? tone.fg : "var(--foreground)",
+              }}
+            >
+              {DECISION_LABEL[option]}
+            </button>
+          );
+        })}
       </div>
 
       <textarea
@@ -60,7 +64,7 @@ export default function DecisionForm({
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Notes for the audit trail (optional)"
         rows={2}
-        className="w-full rounded border px-3 py-2 text-sm outline-none"
+        className="w-full rounded-[var(--radius-control)] border px-3 py-2 text-sm outline-none"
         style={{ borderColor: "var(--border)", backgroundColor: "var(--panel)" }}
       />
 
@@ -68,18 +72,26 @@ export default function DecisionForm({
         <button
           type="submit"
           disabled={isPending}
-          className="w-fit rounded px-4 py-2 text-sm font-medium disabled:opacity-60"
+          className="w-fit rounded-[var(--radius-control)] px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-60"
           style={{ backgroundColor: "var(--cobalt)", color: "var(--cobalt-foreground)" }}
         >
-          {isPending ? "Submitting..." : "Submit decision"}
+          {isPending ? "Submitting…" : "Submit decision"}
         </button>
         {status === "success" && (
-          <span className="text-xs" style={{ color: "var(--risk-low)" }}>
+          <span
+            className="inline-flex items-center gap-1.5 text-xs font-medium"
+            style={{ color: "var(--risk-low)" }}
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
             Decision recorded.
           </span>
         )}
         {status === "error" && (
-          <span className="text-xs" style={{ color: "var(--risk-high)" }}>
+          <span
+            className="inline-flex items-center gap-1.5 text-xs font-medium"
+            style={{ color: "var(--risk-high)" }}
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
             Couldn&apos;t submit. Try again.
           </span>
         )}
