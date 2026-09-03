@@ -71,6 +71,15 @@ class BenchmarkTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_benchmark(transactions=_small_dataset()[:5])
 
+    def test_includes_ml_feature_importances(self) -> None:
+        results = run_benchmark(transactions=_small_dataset(), test_size=0.25, seed=1)
+
+        importances = results["ml_feature_importances"]
+        self.assertTrue(importances)
+        for value in importances.values():
+            self.assertGreaterEqual(value, 0.0)
+        self.assertAlmostEqual(sum(importances.values()), 1.0, places=4)
+
     def test_pattern_counts_cover_generated_labels(self) -> None:
         dataset = _small_dataset()
         results = run_benchmark(transactions=dataset, test_size=0.25, seed=1)
