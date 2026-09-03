@@ -1,10 +1,15 @@
 import Link from "next/link";
-import { getCase } from "@/lib/api";
-import DecisionBadge from "@/components/DecisionBadge";
+import { getCase, getCaseGraph } from "@/lib/api";
 import DecisionForm from "@/components/DecisionForm";
+import FraudRingGraph from "@/components/FraudRingGraph";
+import MaskedId from "@/components/MaskedId";
 import Panel from "@/components/Panel";
+import SignalBar from "@/components/SignalBar";
 import { formatAmount, formatScore, formatTimestamp, DECISION_TONE } from "@/lib/risk";
+import { RISK_TIER_LABEL } from "@/lib/tier";
+import { formatAgentName } from "@/lib/agents";
 import { plainReason } from "@/lib/reasons";
+import type { CaseGraph } from "@/lib/types";
 
 export default async function CasePage({
   searchParams,
@@ -39,164 +44,159 @@ export default async function CasePage({
     );
   }
 
-  const { transaction, agent_scores, graph_evidence, fraud_dna_match } = caseDetail;
+  // A failed graph fetch is treated exactly like "no ring" (null) — never
+  // fabricated, never silently different from the documented empty state.
+  let caseGraph: CaseGraph | null = null;
+  try {
+    const graphResponse = await getCaseGraph(txnId);
+    caseGraph = graphResponse.graph;
+  } catch {
+    caseGraph = null;
+  }
+
+  const { transaction, agent_scores, fraud_dna_match, graph_evidence } = caseDetail;
   const tone = DECISION_TONE[caseDetail.decision];
+  const sortedSignals = [...agent_scores].sort((a, b) => b.score - a.score);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-6">
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <Link
           href="/feed"
           className="rounded-sm text-xs font-medium underline underline-offset-2"
           style={{ color: "var(--cobalt)" }}
         >
-          ← Back to alert feed
+          ← Back to feed
         </Link>
         <span className="font-mono text-xs" style={{ color: "var(--muted)" }}>
           {caseDetail.case_id}
         </span>
       </div>
 
+      <h1 className="mb-4 text-xl font-semibold tracking-tight" style={{ color: "var(--foreground)" }}>
+        CASE INVESTIGATION
+      </h1>
+
       <div className="flex flex-col gap-4">
-        {/* Plain-language summary, leads with recommended action + confidence */}
-        <Panel title="Recommendation" accent={tone.fg} raised>
-          <div className="flex items-center gap-2.5">
-            <DecisionBadge decision={caseDetail.decision} />
-            <span className="font-mono text-xs" style={{ color: "var(--muted)" }}>
+        {/* 1. CASE SUMMARY */}
+        <Panel title="Case summary" accent={tone.fg} raised>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-bold tracking-wide" style={{ color: tone.fg }}>
+              {RISK_TIER_LABEL[caseDetail.decision]}
+            </span>
+            <span className="font-mono text-sm font-semibold">
+              {formatAmount(transaction.amount)} transaction
+            </span>
+            <span className="text-sm" style={{ color: "var(--muted)" }}>
+              Account <MaskedId value={transaction.account_id} />
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: "var(--muted)" }}>
+            <span>
               {formatScore(caseDetail.confidence)} confidence · risk score{" "}
               {formatScore(caseDetail.final_score)}
             </span>
+            <span className="capitalize">
+              {transaction.merchant_category.replace(/_/g, " ")} ·{" "}
+              {transaction.channel.replace(/_/g, " ")}
+            </span>
+            <span className="font-mono">{formatTimestamp(transaction.timestamp)}</span>
           </div>
           <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
             {caseDetail.recommended_action}
           </p>
-
-          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs sm:grid-cols-3">
-            <div>
-              <dt style={{ color: "var(--muted)" }}>Amount</dt>
-              <dd className="font-mono">{formatAmount(transaction.amount)}</dd>
-            </div>
-            <div>
-              <dt style={{ color: "var(--muted)" }}>Merchant</dt>
-              <dd className="capitalize">{transaction.merchant_category.replace(/_/g, " ")}</dd>
-            </div>
-            <div>
-              <dt style={{ color: "var(--muted)" }}>Channel</dt>
-              <dd className="capitalize">{transaction.channel.replace(/_/g, " ")}</dd>
-            </div>
-            <div>
-              <dt style={{ color: "var(--muted)" }}>Account</dt>
-              <dd className="font-mono">{transaction.account_id}</dd>
-            </div>
-            <div>
-              <dt style={{ color: "var(--muted)" }}>Location</dt>
-              <dd className="capitalize">{transaction.location}</dd>
-            </div>
-            <div>
-              <dt style={{ color: "var(--muted)" }}>Time</dt>
-              <dd className="font-mono">{formatTimestamp(transaction.timestamp)}</dd>
-            </div>
-          </dl>
         </Panel>
 
-        {/* Agent evidence */}
-        <Panel title="Agent evidence">
-          <div className="flex flex-col divide-y" style={{ borderColor: "var(--border)" }}>
-            {agent_scores.map((agent) => (
-              <div key={agent.agent_name} className="py-2.5 first:pt-0 last:pb-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium capitalize">
-                    {agent.agent_name.replace(/_/g, " ")}
+        {/* 2. WHY THIS WAS FLAGGED */}
+        <Panel title="Why this was flagged">
+          {caseDetail.explanation_reasons.length > 0 ? (
+            <ul className="flex flex-col gap-1.5 text-sm" style={{ color: "var(--foreground)" }}>
+              {caseDetail.explanation_reasons.map((reason, i) => (
+                <li key={i}>{plainReason(reason)}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
+              No specific risk factors were flagged for this transaction.
+            </p>
+          )}
+        </Panel>
+
+        {/* 3. RISK SIGNALS — every real agent_scores entry, not a fixed taxonomy */}
+        <Panel title="Risk signals">
+          {sortedSignals.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {sortedSignals.map((signal, i) => (
+                <div key={signal.agent_name} className="flex items-start gap-2">
+                  <span
+                    className="mt-0.5 shrink-0 font-mono text-xs"
+                    style={{ color: "var(--border)" }}
+                    aria-hidden="true"
+                  >
+                    {i === sortedSignals.length - 1 ? "└──" : "├──"}
                   </span>
-                  <span className="font-mono text-xs" style={{ color: "var(--muted)" }}>
-                    score {formatScore(agent.score)} · confidence {formatScore(agent.confidence)}
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <SignalBar label={formatAgentName(signal.agent_name)} score={signal.score} />
+                    {signal.reasons.length > 0 && (
+                      <ul className="mt-1 flex flex-col gap-0.5 pl-1 text-[11px]" style={{ color: "var(--muted)" }}>
+                        {signal.reasons.map((reason, j) => (
+                          <li key={j}>{plainReason(reason)}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
-                {agent.reasons.length > 0 && (
-                  <ul className="mt-1 list-inside list-disc text-xs" style={{ color: "var(--muted)" }}>
-                    {agent.reasons.map((reason, i) => (
-                      <li key={i}>{plainReason(reason)}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
+              No signal data available for this case.
+            </p>
+          )}
         </Panel>
 
-        {/* Graph evidence, only when present */}
-        {graph_evidence && (
-          <Panel title="Graph evidence">
+        {/* 4. FRAUD RING — real interactive graph, or an explicit empty state */}
+        <Panel title="Fraud ring">
+          {graph_evidence && (
             <p className="mb-3 text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
               {graph_evidence.evidence_summary}
             </p>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs sm:grid-cols-3">
-              <div>
-                <dt style={{ color: "var(--muted)" }}>Ring size</dt>
-                <dd className="font-mono">{graph_evidence.ring_size}</dd>
+          )}
+          <FraudRingGraph graph={caseGraph} />
+        </Panel>
+
+        {/* 5. FRAUD DNA — only real content when present, explicit empty state when not */}
+        <Panel title="Fraud DNA">
+          {fraud_dna_match ? (
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-sm font-medium capitalize">
+                  {fraud_dna_match.fraud_type.replace(/_/g, " ")}
+                </span>
+                <span className="font-mono text-xs" style={{ color: "var(--muted)" }}>
+                  {formatScore(fraud_dna_match.similarity_score)} similarity · ring{" "}
+                  {fraud_dna_match.matched_ring_id}
+                </span>
               </div>
-              <div>
-                <dt style={{ color: "var(--muted)" }}>Connected accounts</dt>
-                <dd className="font-mono">{graph_evidence.connected_accounts.length}</dd>
-              </div>
-              <div>
-                <dt style={{ color: "var(--muted)" }}>Shared devices</dt>
-                <dd className="font-mono">{graph_evidence.shared_devices.length}</dd>
-              </div>
-              <div>
-                <dt style={{ color: "var(--muted)" }}>Shared IPs</dt>
-                <dd className="font-mono">{graph_evidence.shared_ips.length}</dd>
-              </div>
-              <div>
-                <dt style={{ color: "var(--muted)" }}>Shared merchants</dt>
-                <dd className="font-mono">{graph_evidence.shared_merchants.length}</dd>
-              </div>
-              <div>
-                <dt style={{ color: "var(--muted)" }}>Graph density</dt>
-                <dd className="font-mono">{graph_evidence.graph_density.toFixed(2)}</dd>
-              </div>
-            </dl>
-            {graph_evidence.suspicious_cluster && (
-              <p
-                className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-semibold"
-                style={{ color: "var(--risk-high)", backgroundColor: "var(--risk-high-bg)" }}
-              >
-                <span
-                  className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current"
-                  aria-hidden="true"
-                />
-                Flagged as part of a suspicious cluster · ring {graph_evidence.ring_id ?? "unknown"}
+              <p className="text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
+                {fraud_dna_match.description}
               </p>
-            )}
-          </Panel>
-        )}
-
-        {/* Fraud DNA match, only when present */}
-        {fraud_dna_match && (
-          <Panel title="Fraud DNA match">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="text-sm font-medium capitalize">
-                {fraud_dna_match.fraud_type.replace(/_/g, " ")}
-              </span>
-              <span className="font-mono text-xs" style={{ color: "var(--muted)" }}>
-                {formatScore(fraud_dna_match.similarity_score)} similarity · ring{" "}
-                {fraud_dna_match.matched_ring_id}
-              </span>
+              <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
+                Modus operandi: {fraud_dna_match.modus_operandi}
+              </p>
+              <p className="mt-2 text-xs font-medium" style={{ color: "var(--risk-high)" }}>
+                {fraud_dna_match.recommendation}
+              </p>
             </div>
-            <p className="text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
-              {fraud_dna_match.description}
+          ) : (
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
+              No Fraud DNA match — this case has not been matched to a known fraud pattern.
             </p>
-            <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
-              Modus operandi: {fraud_dna_match.modus_operandi}
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: "var(--risk-high)" }}>
-              {fraud_dna_match.recommendation}
-            </p>
-          </Panel>
-        )}
+          )}
+        </Panel>
 
-        {/* Decision submission */}
-        <Panel title="Analyst decision">
+        {/* 6. DECISION */}
+        <Panel title="Decision">
           <DecisionForm txnId={caseDetail.txn_id} currentDecision={caseDetail.decision} />
         </Panel>
       </div>
