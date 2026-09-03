@@ -25,13 +25,34 @@ from fraudlens.models.schemas import AgentScore, Decision, ScoringResult
 # for AUC-PR gains past this point that risk overfitting to one
 # benchmark split. Re-check this if the benchmark's dataset composition
 # changes meaningfully.
+#
+# fraud_dna_agent matches graph_agent/ml_agent's weight deliberately: a
+# confirmed match against the known-pattern library is institutional
+# memory, not a fresh guess, so when it fires it should carry at least as
+# much weight as the strongest statistical signals. It abstains (see
+# ABSTAIN_CONFIDENCE below) on the large majority of transactions that
+# aren't part of a detected ring, so this weight only ever applies to the
+# minority of cases where it actually has an opinion.
 WEIGHTS: dict[str, float] = {
     "graph_agent": 0.35,
     "velocity_agent": 0.25,
     "behavioral_agent": 0.20,
     "rule_agent": 0.20,
     "ml_agent": 0.35,
+    "fraud_dna_agent": 0.35,
 }
+
+# An agent reports confidence == 0.0 to mean "not applicable to this
+# transaction," not "confidently clear." Fraud DNA is the first agent
+# that needs this: most transactions aren't part of any detected ring, so
+# it has nothing to compare. Without this exclusion, an abstaining
+# agent's implicit 0.0 score would count as a confident "not fraud" vote
+# in the weighted average — actively dragging down the score for exactly
+# the novel-pattern transactions where the other agents are the only
+# defense. Treated as a genuine abstention, excluded from both the
+# weighted average and the confidence spread, but still surfaced in
+# explanation_reasons so an analyst can see it was checked.
+ABSTAIN_CONFIDENCE = 0.0
 
 _BLOCK_AND_REPORT_THRESHOLD = 0.80
 _BLOCK_THRESHOLD = 0.60
@@ -51,9 +72,16 @@ class EnsembleScorer:
                 explanation_reasons=["No scoring agents registered"],
             )
 
+        usable = [a for a in agent_scores if a.confidence > ABSTAIN_CONFIDENCE]
+        if not usable:
+            # Every agent abstained (only possible if fraud_dna_agent is the
+            # sole registered agent and found nothing) — fall back to the
+            # full list rather than divide by zero.
+            usable = agent_scores
+
         total_weight = 0.0
         weighted_sum = 0.0
-        for a in agent_scores:
+        for a in usable:
             w = WEIGHTS.get(a.agent_name, 0.25)
             weighted_sum += a.score * w
             total_weight += w
@@ -61,13 +89,13 @@ class EnsembleScorer:
 
         # Critical signal boost: one very strong, high-confidence agent
         # shouldn't get diluted into silence by agents that saw nothing.
-        max_agent = max(agent_scores, key=lambda a: a.score)
+        max_agent = max(usable, key=lambda a: a.score)
         if max_agent.score >= 0.9 and max_agent.confidence >= 0.8:
             final_score += (max_agent.score - final_score) * 0.7
 
         final_score = round(min(final_score, 1.0), 4)
         decision = self._decide(final_score)
-        confidence = self._compute_confidence(agent_scores, max_agent)
+        confidence = self._compute_confidence(usable, max_agent)
 
         reasons: list[str] = []
         for a in agent_scores:
