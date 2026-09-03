@@ -1,8 +1,9 @@
-"""Stage A end-to-end proof: assemble every merged agent into the case
-engine and score a real transaction from the synthetic dataset.
+"""End-to-end proof: assemble every merged agent plus the graph and Fraud
+DNA layers into the case engine, and score real transactions from the
+synthetic dataset.
 
-This is the Checkpoint A demo — run it to see one transaction go from raw
-data through all four agents to a final decision.
+Run this to see one transaction go from raw data through all four agents,
+ring detection, Fraud DNA matching, to a final decision and recommendation.
 """
 
 from __future__ import annotations
@@ -55,7 +56,13 @@ def main() -> None:
         print(f"  final_score = {case.final_score:.3f}   decision = {case.decision.value}   confidence = {case.confidence:.3f}")
         for score in case.agent_scores:
             print(f"    [{score.agent_name}] {score.score:.2f} — {score.reasons[:1]}")
-        print(f"  recommended_action: {case.recommended_action.splitlines()[0]}")
+        if case.graph_evidence:
+            ge = case.graph_evidence
+            print(f"  graph_evidence: ring_size={ge.ring_size} ({ge.ring_id}) — {ge.evidence_summary}")
+        if case.fraud_dna_match:
+            dna = case.fraud_dna_match
+            print(f"  fraud_dna_match: {dna.similarity_score:.0%} match to '{dna.fraud_type}' ({dna.matched_ring_id})")
+        print(f"  recommended_action:\n    {case.recommended_action.replace(chr(10), chr(10) + '    ')}")
         print()
 
 
