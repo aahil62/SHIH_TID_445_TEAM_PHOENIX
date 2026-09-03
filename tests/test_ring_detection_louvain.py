@@ -121,6 +121,21 @@ class WeaklyBridgedClustersTests(unittest.TestCase):
         evidence = self.builder.get_graph_evidence("CLUSTER1-C3", depth=8)
         self.assertEqual(evidence.ring_size, 3)
 
+    def test_connected_accounts_matches_ring_not_wider_bfs_neighborhood(self) -> None:
+        # The bug this whole fixture exists to catch: ring_size correctly
+        # reported 3 (Louvain), but connected_accounts was still built from
+        # the full depth=8 BFS reach — all 6 accounts across both clusters
+        # — since it read subgraph.nodes directly instead of the detected
+        # community. That mismatch would have fed Fraud DNA fingerprinting
+        # a blended profile of two unrelated rings.
+        evidence = self.builder.get_graph_evidence("CLUSTER1-C1", depth=8)
+
+        self.assertEqual(len(evidence.connected_accounts), evidence.ring_size)
+        self.assertEqual(sorted(evidence.connected_accounts), ["C1", "C2", "C3"])
+        self.assertNotIn("C4", evidence.connected_accounts)
+        self.assertNotIn("C5", evidence.connected_accounts)
+        self.assertNotIn("C6", evidence.connected_accounts)
+
 
 if __name__ == "__main__":
     unittest.main()
