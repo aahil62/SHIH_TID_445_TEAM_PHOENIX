@@ -78,11 +78,11 @@ class VelocityAgentTests(unittest.TestCase):
 
     def test_high_24h_spend_flags(self) -> None:
         history = [
-            _txn("TXN-H1", "ACC-4", 6000.0, "2026-09-03T08:00:00+00:00"),
+            _txn("TXN-H1", "ACC-4", 500_000.0, "2026-09-03T08:00:00+00:00"),
         ]
         self.agent.set_transactions(history)
 
-        txn = _txn("TXN-005", "ACC-4", 5000.0, "2026-09-03T18:00:00+00:00")
+        txn = _txn("TXN-005", "ACC-4", 400_000.0, "2026-09-03T18:00:00+00:00")
         result = self.agent.score(txn)
 
         joined = " ".join(result.reasons)
@@ -105,15 +105,15 @@ class VelocityAgentTests(unittest.TestCase):
 
     def test_multi_flag_transaction_scores_high(self) -> None:
         history = [
-            _txn("TXN-H1", "ACC-6", 4000.0, "2026-09-03T10:00:00+00:00"),
-            _txn("TXN-H2", "ACC-6", 4000.0, "2026-09-03T11:00:00+00:00"),
-            _txn("TXN-H3", "ACC-6", 4000.0, "2026-09-03T11:30:00+00:00"),
-            _txn("TXN-H4", "ACC-6", 4000.0, "2026-09-03T11:45:00+00:00"),
-            _txn("TXN-H5", "ACC-6", 4000.0, "2026-09-03T11:50:00+00:00"),
+            _txn("TXN-H1", "ACC-6", 150_000.0, "2026-09-03T10:00:00+00:00"),
+            _txn("TXN-H2", "ACC-6", 150_000.0, "2026-09-03T11:00:00+00:00"),
+            _txn("TXN-H3", "ACC-6", 150_000.0, "2026-09-03T11:30:00+00:00"),
+            _txn("TXN-H4", "ACC-6", 150_000.0, "2026-09-03T11:45:00+00:00"),
+            _txn("TXN-H5", "ACC-6", 150_000.0, "2026-09-03T11:50:00+00:00"),
         ]
         self.agent.set_transactions(history)
 
-        txn = _txn("TXN-007", "ACC-6", 4000.0, "2026-09-03T11:55:00+00:00")
+        txn = _txn("TXN-007", "ACC-6", 150_000.0, "2026-09-03T11:55:00+00:00")
         result = self.agent.score(txn)
 
         self.assertGreater(result.score, 0.6)

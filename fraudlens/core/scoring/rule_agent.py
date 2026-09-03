@@ -13,8 +13,12 @@ from datetime import datetime
 
 from fraudlens.models.schemas import AgentScore, Transaction
 
-_MAJOR_AMOUNT_THRESHOLD = 5000.0
-_MINOR_AMOUNT_THRESHOLD = 2000.0
+# Amounts are INR (SH-FIN-01 is an RBI-context Indian fraud problem).
+# Thresholds are scaled from the original USD design (~85 INR/USD) and
+# rounded to figures that read naturally in Indian retail/banking terms,
+# not a precise economic model of what's "risky" at each price point.
+_MAJOR_AMOUNT_THRESHOLD = 400_000.0
+_MINOR_AMOUNT_THRESHOLD = 150_000.0
 
 _RISKY_MERCHANT_CATEGORIES = frozenset({
     "crypto_exchange",
@@ -39,12 +43,12 @@ _RISKY_LOCATIONS = frozenset({
 
 _RISKY_HOURS = frozenset(range(0, 4))  # midnight-4am, inclusive of 0..3
 
-_ONLINE_HIGH_AMOUNT_THRESHOLD = 1000.0
+_ONLINE_HIGH_AMOUNT_THRESHOLD = 75_000.0
 
-# Amounts within this many dollars of a threshold read as "just under the
+# Amounts within this many rupees of a threshold read as "just under the
 # limit" — a classic structuring tell.
-_STRUCTURING_MARGIN = 50.0
-_STRUCTURING_THRESHOLDS = (_MINOR_AMOUNT_THRESHOLD, _MAJOR_AMOUNT_THRESHOLD, 10000.0)
+_STRUCTURING_MARGIN = 4_000.0
+_STRUCTURING_THRESHOLDS = (_MINOR_AMOUNT_THRESHOLD, _MAJOR_AMOUNT_THRESHOLD, 800_000.0)
 
 _CONFIDENCE = 0.9
 
@@ -85,14 +89,14 @@ class RuleAgent:
         if txn.amount > _MAJOR_AMOUNT_THRESHOLD:
             points += 0.5
             reasons.append(
-                f"Amount ${txn.amount:,.2f} exceeds major threshold "
-                f"(${_MAJOR_AMOUNT_THRESHOLD:,.0f})"
+                f"Amount ₹{txn.amount:,.2f} exceeds major threshold "
+                f"(₹{_MAJOR_AMOUNT_THRESHOLD:,.0f})"
             )
         elif txn.amount > _MINOR_AMOUNT_THRESHOLD:
             points += 0.25
             reasons.append(
-                f"Amount ${txn.amount:,.2f} exceeds minor threshold "
-                f"(${_MINOR_AMOUNT_THRESHOLD:,.0f})"
+                f"Amount ₹{txn.amount:,.2f} exceeds minor threshold "
+                f"(₹{_MINOR_AMOUNT_THRESHOLD:,.0f})"
             )
         return points, reasons
 
@@ -134,7 +138,7 @@ class RuleAgent:
         if channel == "online" and txn.amount > _ONLINE_HIGH_AMOUNT_THRESHOLD:
             points += 0.15
             reasons.append(
-                f"High-value online transaction (${txn.amount:,.2f} via {channel})"
+                f"High-value online transaction (₹{txn.amount:,.2f} via {channel})"
             )
         return points, reasons
 
@@ -146,13 +150,13 @@ class RuleAgent:
 
         if amount > 0 and amount % 100 == 0:
             points += 0.1
-            reasons.append(f"Suspicious round-number amount (${amount:,.2f})")
+            reasons.append(f"Suspicious round-number amount (₹{amount:,.2f})")
 
         for threshold in _STRUCTURING_THRESHOLDS:
             if threshold - _STRUCTURING_MARGIN <= amount < threshold:
                 points += 0.2
                 reasons.append(
-                    f"Amount ${amount:,.2f} sits just under the ${threshold:,.0f} "
+                    f"Amount ₹{amount:,.2f} sits just under the ₹{threshold:,.0f} "
                     "threshold (possible structuring)"
                 )
                 break

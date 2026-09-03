@@ -24,10 +24,12 @@ _HOUR_COUNT_MINOR = 2
 _DAY_COUNT_MAJOR = 10
 _DAY_COUNT_MINOR = 6
 
-_DAY_SPEND_THRESHOLD = 10000.0
+# INR — scaled from the original USD design (~85 INR/USD), see
+# rule_agent.py's threshold comment for the same rationale.
+_DAY_SPEND_THRESHOLD = 800_000.0
 
 _CARD_TESTING_MIN_COUNT = 3
-_CARD_TESTING_MAX_AMOUNT = 10.0
+_CARD_TESTING_MAX_AMOUNT = 800.0
 
 _CONFIDENCE_WITH_HISTORY = 0.85
 _CONFIDENCE_WITHOUT_HISTORY = 0.5
@@ -144,7 +146,7 @@ class VelocityAgent:
         )
         if total > _DAY_SPEND_THRESHOLD:
             points += 0.3
-            reasons.append(f"Total 24h spend ${total:,.2f} exceeds ${_DAY_SPEND_THRESHOLD:,.0f}")
+            reasons.append(f"Total 24h spend ₹{total:,.2f} exceeds ₹{_DAY_SPEND_THRESHOLD:,.0f}")
         return points, reasons
 
     @staticmethod
@@ -168,7 +170,7 @@ class VelocityAgent:
             minutes = int(_CARD_TESTING_WINDOW.total_seconds() // 60)
             reasons.append(
                 f"Card-testing pattern: {len(small_in_window)} rapid transactions under "
-                f"${_CARD_TESTING_MAX_AMOUNT:,.0f} within {minutes} minutes"
+                f"₹{_CARD_TESTING_MAX_AMOUNT:,.0f} within {minutes} minutes"
             )
         return points, reasons
 

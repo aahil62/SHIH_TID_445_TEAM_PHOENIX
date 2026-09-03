@@ -103,12 +103,12 @@ class BehavioralAgent:
             if ratio >= _AMOUNT_RATIO_MAJOR:
                 signal_scores.append(0.85)
                 reasons.append(
-                    f"Amount is {ratio:.1f}x the account's average (${avg:.2f})"
+                    f"Amount is {ratio:.1f}x the account's average (₹{avg:.2f})"
                 )
             elif ratio >= _AMOUNT_RATIO_MINOR:
                 signal_scores.append(0.5)
                 reasons.append(
-                    f"Amount is {ratio:.1f}x the account's average (${avg:.2f})"
+                    f"Amount is {ratio:.1f}x the account's average (₹{avg:.2f})"
                 )
 
         categories = {e.category for e in history}

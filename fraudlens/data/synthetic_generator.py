@@ -9,7 +9,7 @@ Fraud patterns generated:
   - high_amount     : single transaction far above normal thresholds
   - risky_merchant  : transaction at a high-risk merchant category
   - odd_hour        : moderate/high amount transaction between 12am-4am
-  - card_testing    : burst of tiny (<$10) transactions on one account
+  - card_testing    : burst of tiny (<₹800) transactions on one account
   - high_velocity   : burst of many transactions on one account within 1h
   - fraud_ring      : multiple accounts sharing devices/IPs transacting in
                       a short window — feature/graph-behavioral's ring
@@ -50,26 +50,30 @@ _RISKY_LOCATIONS = [
 
 _CHANNELS = ["online", "in_store", "mobile_app", "atm"]
 
+# INR — scaled from the original USD design (~85 INR/USD), consistent
+# with the thresholds in rule_agent.py/velocity_agent.py and the Fraud
+# DNA seed profiles/log-scale in dna/store.py and dna/matcher.py. All
+# five files share this magnitude; rescale together, not individually.
 _AMOUNT_RANGES: dict[str, tuple[float, float]] = {
-    "groceries": (10, 150),
-    "electronics": (50, 2000),
-    "restaurants": (10, 120),
-    "gas_station": (20, 90),
-    "pharmacy": (5, 80),
-    "clothing": (20, 300),
-    "entertainment": (10, 150),
-    "travel": (100, 3000),
-    "utilities": (30, 250),
-    "subscription": (5, 60),
-    "home_improvement": (20, 1000),
-    "education": (50, 2000),
-    "crypto_exchange": (200, 8000),
-    "gambling": (50, 3000),
-    "gift_cards": (25, 2000),
-    "jewelry": (100, 6000),
-    "luxury_goods": (200, 9000),
-    "money_transfer": (100, 5000),
-    "digital_goods": (10, 500),
+    "groceries": (800, 12_000),
+    "electronics": (4_000, 170_000),
+    "restaurants": (800, 10_000),
+    "gas_station": (1_500, 7_500),
+    "pharmacy": (400, 7_000),
+    "clothing": (1_500, 25_000),
+    "entertainment": (800, 12_000),
+    "travel": (8_000, 250_000),
+    "utilities": (2_500, 20_000),
+    "subscription": (400, 5_000),
+    "home_improvement": (1_500, 85_000),
+    "education": (4_000, 170_000),
+    "crypto_exchange": (15_000, 680_000),
+    "gambling": (4_000, 250_000),
+    "gift_cards": (2_000, 170_000),
+    "jewelry": (8_000, 500_000),
+    "luxury_goods": (15_000, 750_000),
+    "money_transfer": (8_000, 400_000),
+    "digital_goods": (800, 40_000),
 }
 
 FRAUD_PATTERN_TYPES = (
@@ -147,10 +151,10 @@ def make_normal_transaction(
 
 def make_high_amount_fraud(rng: random.Random, account_id: str, day: datetime) -> Transaction:
     category = rng.choice(_NORMAL_MERCHANT_CATEGORIES + _RISKY_MERCHANT_CATEGORIES)
-    # Half the time land just under the $5000 major-threshold rule (a
+    # Half the time land just under the ₹4,00,000 major-threshold rule (a
     # structuring tell), the rest clearly over it.
     amount = round(
-        rng.uniform(4950, 4999.99) if rng.random() < 0.5 else rng.uniform(5001, 15000), 2
+        rng.uniform(395_000, 399_999) if rng.random() < 0.5 else rng.uniform(400_001, 1_200_000), 2
     )
     return Transaction(
         txn_id=_new_txn_id(rng),
@@ -193,7 +197,7 @@ def make_odd_hour_fraud(rng: random.Random, account_id: str, day: datetime) -> T
     return Transaction(
         txn_id=_new_txn_id(rng),
         account_id=account_id,
-        amount=round(rng.uniform(max(low, 300), max(high, 400)), 2),
+        amount=round(rng.uniform(max(low, 25_000), max(high, 30_000)), 2),
         merchant_id=_rand_id(rng, "MER"),
         merchant_category=category,
         device_id=_rand_id(rng, "DEV"),
@@ -219,7 +223,7 @@ def make_card_testing_burst(rng: random.Random, account_id: str, day: datetime) 
         txns.append(Transaction(
             txn_id=_new_txn_id(rng),
             account_id=account_id,
-            amount=round(rng.uniform(0.5, 9.5), 2),
+            amount=round(rng.uniform(40, 750), 2),
             merchant_id=_rand_id(rng, "MER"),
             merchant_category=rng.choice(_NORMAL_MERCHANT_CATEGORIES + ["digital_goods"]),
             device_id=device_id,

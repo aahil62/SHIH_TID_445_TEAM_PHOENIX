@@ -66,7 +66,7 @@ class ReportGenerator:
             f"## Transaction Summary\n\n"
             f"| Field | Value |\n|---|---|\n"
             f"| **Account** | `{mask_identifier(txn.account_id)}` |\n"
-            f"| **Amount** | ${txn.amount:,.2f} |\n"
+            f"| **Amount** | ₹{txn.amount:,.2f} |\n"
             f"| **Merchant** | {mask_identifier(txn.merchant_id)} ({txn.merchant_category}) |\n"
             f"| **Timestamp** | {txn.timestamp} |\n"
             f"| **Channel** | {txn.channel} |\n"

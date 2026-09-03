@@ -89,7 +89,7 @@ class SyntheticGeneratorTests(unittest.TestCase):
             device_to_accounts[t.device_id].add(t.account_id)
         self.assertTrue(any(len(accts) > 1 for accts in device_to_accounts.values()))
 
-    def test_card_testing_burst_all_under_ten_dollars(self) -> None:
+    def test_card_testing_burst_all_under_800_rupees(self) -> None:
         txns = generate_synthetic_transactions(
             num_normal=0, num_high_amount=0, num_risky_merchant=0,
             num_odd_hour=0, num_card_testing_bursts=3,
@@ -98,7 +98,7 @@ class SyntheticGeneratorTests(unittest.TestCase):
         self.assertTrue(txns)
         for t in txns:
             self.assertEqual(t.fraud_pattern_type, "card_testing")
-            self.assertLess(t.amount, 10.0)
+            self.assertLess(t.amount, 800.0)
 
     def test_zero_counts_produce_empty_dataset(self) -> None:
         txns = generate_synthetic_transactions(
