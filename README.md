@@ -12,9 +12,14 @@ Grand Finale build in progress. See commit history for real-time progress agains
 own build plan.
 
 - [x] Stage A — core schemas, ensemble scorer, case engine skeleton (`main`)
-- [ ] Stage B — Fraud DNA, decision workflow, full API, frontend, trained ML agent, benchmark suite
+- [x] Fraud DNA, decision workflow (`feature/graph-behavioral`) — merged
+- [x] Trained ML agent, benchmark suite (`feature/rules-velocity`) — merged
+- [x] Report generator, full FastAPI route surface (`main`) — merged
+- [ ] Frontend wired to live data (`feature/frontend`) — not started
 - [ ] Stage C — Copilot, model-performance panel, literature grounding
 - [ ] Stage D — integration freeze
+
+Backend is fully runnable today — see "Running tests" and "Running the API" below.
 
 ## Branches
 
@@ -31,4 +36,15 @@ own build plan.
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python -m unittest discover -s tests
+python scripts/run_demo.py   # end-to-end: a real transaction through every agent
 ```
+
+## Running the API
+
+```bash
+source .venv/bin/activate
+uvicorn fraudlens.api.main:app --reload --port 8001
+```
+
+Then: `curl http://127.0.0.1:8001/health` or `curl "http://127.0.0.1:8001/transactions/recent?limit=5"`.
+Interactive docs at `http://127.0.0.1:8001/docs`.
