@@ -5,3 +5,4 @@ scikit-learn>=1.3
 fastapi>=0.115
 uvicorn[standard]>=0.34
 httpx>=0.27  # needed by fastapi.testclient in tests/test_api.py
+networkx>=3.2  # louvain_communities for graph/community.py's ring detection
