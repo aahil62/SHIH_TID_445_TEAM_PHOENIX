@@ -1,18 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --canvas: #f4f6f9;
+  --canvas: #f3f4f8;
   --panel: #ffffff;
-  --foreground: #1a2130;
-  --muted: #5b6473;
-  --border: #dfe4ec;
+  --foreground: #171b2c;
+  --muted: #626a80;
+  --border: #dfe2ec;
 
-  --graphite: #232936;
-  --graphite-foreground: #c6cbd6;
+  --graphite: #1c2030;
+  --graphite-foreground: #b7bdd0;
 
-  --cobalt: #2954e0;
+  /* Deep ultramarine — deliberately not Bootstrap/Tailwind's stock blue. */
+  --cobalt: #3538cd;
   --cobalt-foreground: #ffffff;
 
+  /* Risk semantics — reserved strictly for risk states. Values only
+     change between themes for contrast; the hue identity (green/amber/
+     red, with critical reading as more saturated than high) never does. */
   --risk-low: #1f8a4c;
   --risk-low-bg: #e7f6ec;
   --risk-medium: #b5750a;
@@ -21,6 +25,42 @@
   --risk-high-bg: #fcebe7;
   --risk-critical: #9c1c1c;
   --risk-critical-bg: #fbe2e2;
+
+  /* Single radius scale, both values ≤8px: panels/surfaces at 8px,
+     controls (buttons/inputs/badges) slightly tighter at 6px. */
+  --radius-panel: 8px;
+  --radius-control: 6px;
+
+  --shadow-panel: 0 1px 2px rgba(23, 27, 44, 0.05), 0 1px 1px rgba(23, 27, 44, 0.04);
+  --shadow-panel-raised: 0 4px 16px rgba(23, 27, 44, 0.08), 0 1px 2px rgba(23, 27, 44, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0d1018;
+    --panel: #151926;
+    --foreground: #e7e9f2;
+    --muted: #8990a8;
+    --border: #262c40;
+
+    --graphite: #0a0c14;
+    --graphite-foreground: #b7bdd0;
+
+    --cobalt: #7477e8;
+    --cobalt-foreground: #0d1018;
+
+    --risk-low: #3ecf8e;
+    --risk-low-bg: #10251c;
+    --risk-medium: #f0ad3d;
+    --risk-medium-bg: #2a2009;
+    --risk-high: #f0705a;
+    --risk-high-bg: #2c1712;
+    --risk-critical: #ff6b6b;
+    --risk-critical-bg: #341212;
+
+    --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+    --shadow-panel-raised: 0 8px 24px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
 }
 
 @theme inline {
@@ -53,4 +93,16 @@ body {
   background: var(--canvas);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Explicit, guaranteed-visible keyboard focus — never rely on UA default. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
 }
