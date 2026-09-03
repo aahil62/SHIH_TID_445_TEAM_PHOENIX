@@ -1,11 +1,12 @@
 """Case engine — orchestrates registered agents into a FraudCase.
 
 Stage A scope: run whatever ScoringAgents are registered, combine them via
-the ensemble, and assemble a case. graph_evidence and fraud_dna_match are
-None until feature/graph-behavioral lands its Stage B work — the two
-extension points below (_build_graph_evidence, _run_dna_analysis) are
-where that plugs in, so this class's shape doesn't change, only those two
-methods do.
+the ensemble, and assemble a case. Stage B fills in the two extension
+points below: _build_graph_evidence delegates to GraphBuilder's own
+get_graph_evidence(), and _run_dna_analysis feeds the ring's transactions
+through FraudDNAExtractor and FraudDNAMatcher. Both stay None for a
+transaction with no detected ring — this class's shape doesn't change,
+only those two methods do.
 """
 
 from __future__ import annotations
@@ -13,6 +14,10 @@ from __future__ import annotations
 import json
 import os
 
+from fraudlens.core.dna.extractor import FraudDNAExtractor
+from fraudlens.core.dna.matcher import FraudDNAMatcher
+from fraudlens.core.dna.store import FraudDNAStore
+from fraudlens.core.graph.builder import GraphBuilder
 from fraudlens.core.scoring.base import ScoringAgent
 from fraudlens.core.scoring.ensemble import EnsembleScorer
 from fraudlens.models.schemas import (
@@ -46,6 +51,9 @@ class CaseEngine:
         transactions: list[Transaction],
         agents: list[ScoringAgent] | None = None,
         cases_path: str = "fraudlens/data/cases.json",
+        graph_builder: GraphBuilder | None = None,
+        dna_store: FraudDNAStore | None = None,
+        dna_matcher: FraudDNAMatcher | None = None,
     ) -> None:
         self._txn_map: dict[str, Transaction] = {t.txn_id: t for t in transactions}
         self._agents: list[ScoringAgent] = agents or []
@@ -53,6 +61,11 @@ class CaseEngine:
         self._cases_path = cases_path
         self._cases: dict[str, FraudCase] = {}
         self._load_cases()
+
+        self._graph_builder = graph_builder or GraphBuilder()
+        self._graph_builder.build(transactions)
+        self._dna_extractor = FraudDNAExtractor()
+        self._dna_matcher = dna_matcher or FraudDNAMatcher(dna_store or FraudDNAStore())
 
     def analyze(self, txn_id: str) -> FraudCase:
         """Full pipeline for one transaction: score, evaluate, persist."""
@@ -97,10 +110,21 @@ class CaseEngine:
     # ── Stage B extension points (feature/graph-behavioral) ────────────
 
     def _build_graph_evidence(self, txn_id: str) -> GraphEvidence | None:
-        return None
+        try:
+            return self._graph_builder.get_graph_evidence(txn_id)
+        except ValueError:
+            return None
 
     def _run_dna_analysis(self, txn_id: str) -> FraudDNAMatch | None:
-        return None
+        evidence = self._build_graph_evidence(txn_id)
+        if evidence is None:
+            return None
+        ring_accounts = set(evidence.connected_accounts)
+        ring_txns = [t for t in self._txn_map.values() if t.account_id in ring_accounts]
+        if not ring_txns:
+            return None
+        profile = self._dna_extractor.extract_profile(ring_txns, evidence)
+        return self._dna_matcher.match(profile)
 
     # ── Recommendations ──────────────────────────────────────────────
 

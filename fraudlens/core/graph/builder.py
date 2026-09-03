@@ -2,8 +2,8 @@
 
 Builds an account/device/ip/merchant graph from raw transactions and
 supports BFS subgraph extraction with connected-component ring detection
-over shared device/IP edges. Consumed by GraphAgent and, later, the
-Fraud DNA matcher.
+over shared device/IP edges. Consumed by GraphAgent and, via
+get_graph_evidence(), by CaseEngine and the Fraud DNA extractor.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import hashlib
 from collections import defaultdict
 from typing import Optional
 
-from fraudlens.models.schemas import FraudGraph, GraphEdge, GraphNode, Transaction
+from fraudlens.models.schemas import FraudGraph, GraphEdge, GraphEvidence, GraphNode, Transaction
 
 NODE_ACCOUNT = "account"
 NODE_DEVICE = "device"
@@ -121,6 +121,56 @@ class GraphBuilder:
 
         ring_id, ring_size = self._detect_ring(start, visited, sub_edges)
         return FraudGraph(nodes=sub_nodes, edges=sub_edges, ring_id=ring_id, ring_size=ring_size)
+
+    def get_graph_evidence(self, txn_id: str, depth: int = 2) -> Optional[GraphEvidence]:
+        """GraphEvidence for a transaction's subgraph, or None when no ring
+        (2+ connected accounts) is detected — a clean transaction carries
+        no graph evidence worth reporting."""
+        subgraph = self.get_subgraph(txn_id, depth=depth)
+        if subgraph.ring_id is None or subgraph.ring_size < 2:
+            return None
+
+        node_by_id = {n.node_id: n for n in subgraph.nodes}
+        connected_accounts = sorted(
+            n.label for n in subgraph.nodes if n.node_type == NODE_ACCOUNT
+        )
+        shared_devices = sorted(
+            n.label for n in subgraph.nodes if n.node_type == NODE_DEVICE and n.is_suspicious
+        )
+        shared_ips = sorted(
+            n.label for n in subgraph.nodes if n.node_type == NODE_IP and n.is_suspicious
+        )
+
+        merchant_accounts: dict[str, set[str]] = defaultdict(set)
+        for e in subgraph.edges:
+            if e.edge_type == EDGE_TRANSACTS_WITH:
+                merchant_accounts[e.target].add(e.source)
+        shared_merchants = sorted(
+            node_by_id[m].label
+            for m, accounts in merchant_accounts.items()
+            if len(accounts) > 1 and m in node_by_id
+        )
+
+        num_nodes = len(subgraph.nodes)
+        num_edges = len(subgraph.edges)
+        graph_density = (2 * num_edges) / (num_nodes * (num_nodes - 1)) if num_nodes > 1 else 0.0
+
+        evidence_summary = (
+            f"{subgraph.ring_size}-account ring detected, sharing "
+            f"{len(shared_devices)} device(s) and {len(shared_ips)} IP(s)."
+        )
+
+        return GraphEvidence(
+            connected_accounts=connected_accounts,
+            shared_devices=shared_devices,
+            shared_ips=shared_ips,
+            shared_merchants=shared_merchants,
+            ring_size=subgraph.ring_size,
+            ring_id=subgraph.ring_id,
+            suspicious_cluster=True,
+            graph_density=round(graph_density, 4),
+            evidence_summary=evidence_summary,
+        )
 
     def _add_node(self, node_id: str, node_type: str, label: str) -> None:
         if node_id not in self._nodes:
