@@ -1,17 +1,21 @@
 """Graph-based scoring agent for FraudLens.
 
 Flags device/IP sharing across accounts and estimates fraud-ring size via
-a union-find projection over shared devices/IPs. Carries the heaviest
-ensemble weight (0.35 — see fraudlens/core/scoring/ensemble.py), so its
-confidence is deliberately scaled to how large and well-evidenced the
-estimated ring is, rather than being a flat default.
+Louvain community detection over a shared-devices/IPs account projection
+(see fraudlens/core/graph/community.py — the same detector GraphBuilder
+uses for GraphEvidence, so the two ring-size signals stay consistent).
+Carries the heaviest ensemble weight (0.35 — see
+fraudlens/core/scoring/ensemble.py), so its confidence is deliberately
+scaled to how large and well-evidenced the estimated ring is, rather than
+being a flat default.
 """
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Any
 
+from fraudlens.core.graph.community import detect_communities
 from fraudlens.models.schemas import AgentScore, Transaction
 
 _DEVICE_SHARE_MAJOR = 3   # other accounts sharing the device/IP
@@ -23,23 +27,6 @@ _RING_MINOR = 2
 
 _QUIET_SCORE = 0.05
 _BASE_CONFIDENCE = 0.4
-
-
-class _DisjointSet:
-    def __init__(self) -> None:
-        self._parent: dict[str, str] = {}
-
-    def find(self, x: str) -> str:
-        self._parent.setdefault(x, x)
-        while self._parent[x] != x:
-            self._parent[x] = self._parent[self._parent[x]]
-            x = self._parent[x]
-        return x
-
-    def union(self, a: str, b: str) -> None:
-        ra, rb = self.find(a), self.find(b)
-        if ra != rb:
-            self._parent[ra] = rb
 
 
 class GraphAgent:
@@ -55,8 +42,8 @@ class GraphAgent:
 
     def build_index(self, transactions: list[Transaction]) -> None:
         """Index device/IP -> accounts (and vice versa) and precompute
-        each account's estimated ring size via connected components over
-        shared devices/IPs."""
+        each account's estimated ring size via Louvain community
+        detection over a shared-devices/IPs account projection."""
         device_accounts: dict[str, set[str]] = defaultdict(set)
         ip_accounts: dict[str, set[str]] = defaultdict(set)
         account_devices: dict[str, set[str]] = defaultdict(set)
@@ -68,22 +55,27 @@ class GraphAgent:
             account_devices[txn.account_id].add(txn.device_id)
             all_accounts.add(txn.account_id)
 
-        dsu = _DisjointSet()
-        for account_id in all_accounts:
-            dsu.find(account_id)
+        # Project accounts that share a device/IP onto an edge, weighted
+        # by how many devices/IPs they share — a stronger bridge than a
+        # single shared IP, which lets Louvain resolve a weakly-bridged
+        # pair of clusters into two rings instead of one over-counted one.
+        projection_weights: Counter[tuple[str, str]] = Counter()
         for accounts in list(device_accounts.values()) + list(ip_accounts.values()):
-            members = list(accounts)
-            for i in range(1, len(members)):
-                dsu.union(members[0], members[i])
+            unique_accounts = sorted(accounts)
+            for i in range(len(unique_accounts)):
+                for j in range(i + 1, len(unique_accounts)):
+                    projection_weights[(unique_accounts[i], unique_accounts[j])] += 1
 
-        components: dict[str, list[str]] = defaultdict(list)
-        for account_id in all_accounts:
-            components[dsu.find(account_id)].append(account_id)
+        communities = detect_communities(
+            edges=[(a, b, float(w)) for (a, b), w in projection_weights.items()],
+            nodes=all_accounts,
+        )
 
         ring_size_by_account: dict[str, int] = {}
-        for members in components.values():
-            for account_id in members:
-                ring_size_by_account[account_id] = len(members)
+        for community in communities:
+            size = len(community)
+            for account_id in community:
+                ring_size_by_account[account_id] = size
 
         self._device_accounts = dict(device_accounts)
         self._ip_accounts = dict(ip_accounts)
