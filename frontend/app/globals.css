@@ -26,10 +26,11 @@
   --risk-critical: #9c1c1c;
   --risk-critical-bg: #fbe2e2;
 
-  /* Single radius scale, both values ≤8px: panels/surfaces at 8px,
-     controls (buttons/inputs/badges) slightly tighter at 6px. */
-  --radius-panel: 8px;
-  --radius-control: 6px;
+  /* Single radius scale, both values well within the ≤8px constraint —
+     sharpened further than the first retheme pass for the terminal/ops-
+     console aesthetic (sharp edges over soft-rounded ones). */
+  --radius-panel: 3px;
+  --radius-control: 2px;
 
   --shadow-panel: 0 1px 2px rgba(23, 27, 44, 0.05), 0 1px 1px rgba(23, 27, 44, 0.04);
   --shadow-panel-raised: 0 4px 16px rgba(23, 27, 44, 0.08), 0 1px 2px rgba(23, 27, 44, 0.06);
@@ -85,14 +86,19 @@
   --color-risk-critical: var(--risk-critical);
   --color-risk-critical-bg: var(--risk-critical-bg);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Share Tech Mono, everywhere — one font token drives both, no
+     per-component font overrides. See app/layout.tsx. */
+  --font-sans: var(--font-share-tech-mono);
+  --font-mono: var(--font-share-tech-mono);
 }
 
 body {
   background: var(--canvas);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), "Courier New", monospace;
+  /* Tabular alignment for scores/amounts across rows — the terminal-grid
+     feel a monospace-only console should lean into. */
+  font-variant-numeric: tabular-nums;
 }
 
 /* Explicit, guaranteed-visible keyboard focus — never rely on UA default. */
