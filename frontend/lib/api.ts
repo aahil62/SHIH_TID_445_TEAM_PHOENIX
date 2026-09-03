@@ -1,4 +1,10 @@
-import type { Case, DecisionSubmission, RecentTransaction } from "./types";
+import type {
+  Case,
+  CaseGraphResponse,
+  DecisionSubmission,
+  HealthResponse,
+  RecentTransaction,
+} from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8001";
 
@@ -29,4 +35,24 @@ export function submitDecision(payload: DecisionSubmission) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+/** Every case the engine has computed this session (unbounded) — unlike
+ * getRecentTransactions(), each entry carries full real agent_scores, so
+ * the investigation feed's per-signal bars can use it instead of
+ * inventing severity data that isn't in the lighter /transactions/recent
+ * response. */
+export function getCases() {
+  return apiFetch<{ cases: Case[] }>(`/cases`);
+}
+
+/** The real, masked fraud-ring node/edge graph for a case, or
+ * { graph: null } when the transaction has no detected ring. */
+export function getCaseGraph(txnId: string) {
+  return apiFetch<CaseGraphResponse>(`/cases/${encodeURIComponent(txnId)}/graph`);
+}
+
+/** A real liveness check against the backend — never a hardcoded status. */
+export function getHealth() {
+  return apiFetch<HealthResponse>(`/health`);
 }
