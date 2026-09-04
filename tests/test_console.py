@@ -132,23 +132,28 @@ class ConsoleApiTests(unittest.TestCase):
         # not a transaction that was always fine.
         txn_id = "TXN-AF493E2FCD007CAD"  # deterministic block_and_report ring transaction
         self.client.get(f"/cases/{txn_id}")
-        self.client.post("/decisions", json={
-            "txn_id": txn_id, "decision": "clear", "analyst": "console-fp-analyst",
-            "is_false_positive": True,
-        })
+        self.client.post(
+            "/decisions",
+            json={"txn_id": txn_id, "decision": "clear", "is_false_positive": True},
+            headers=self._auth_headers(),
+        )
         rows = self.client.get("/reports?limit=2000").json()["rows"]
         row = next(r for r in rows if r["txn_id"] == txn_id)
         self.assertEqual(row["status"], "FALSE POSITIVE")
         self.assertNotEqual(row["status"], "CLEAR")
-        self.assertEqual(row["analyst"], "console-fp-analyst")
+        # The analyst name comes from the authenticated session (riyer ->
+        # "R. Iyer"), not client-supplied text — DecisionRequest no longer
+        # even accepts an `analyst` field.
+        self.assertEqual(row["analyst"], "R. Iyer")
 
     def test_global_audit_reflects_a_false_positive_correction_distinctly(self) -> None:
         txn_id = "TXN-AF493E2FCD007CAD"
         self.client.get(f"/cases/{txn_id}")
-        self.client.post("/decisions", json={
-            "txn_id": txn_id, "decision": "clear", "analyst": "audit-fp-analyst",
-            "is_false_positive": True,
-        })
+        self.client.post(
+            "/decisions",
+            json={"txn_id": txn_id, "decision": "clear", "is_false_positive": True},
+            headers=self._auth_headers(),
+        )
         events = self.client.get("/audit?limit=200").json()["events"]
         matching = [
             e for e in events
@@ -156,7 +161,7 @@ class ConsoleApiTests(unittest.TestCase):
             and "false positive" in e["text"].lower()
         ]
         self.assertTrue(matching)
-        self.assertIn("audit-fp-analyst", matching[0]["text"])
+        self.assertIn("R. Iyer", matching[0]["text"])
         # Not the generic "recorded decision: CLEAR" phrasing an ordinary
         # clear decision would get.
         self.assertNotIn("recorded decision", matching[0]["text"].lower())

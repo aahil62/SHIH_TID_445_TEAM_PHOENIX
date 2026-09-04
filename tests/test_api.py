@@ -199,11 +199,15 @@ class ApiTests(unittest.TestCase):
 
         before_ring_ids = {p["ring_id"] for p in self.client.get("/dna/patterns").json()["patterns"]}
 
-        resp = self.client.post("/decisions", json={
-            "txn_id": txn_id, "decision": "clear", "analyst": "fp-test-analyst",
-            "notes": "Investigated the ring — legitimate shared household device.",
-            "is_false_positive": True,
-        })
+        resp = self.client.post(
+            "/decisions",
+            json={
+                "txn_id": txn_id, "decision": "clear",
+                "notes": "Investigated the ring — legitimate shared household device.",
+                "is_false_positive": True,
+            },
+            headers=self._auth_headers(),
+        )
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.json()["is_false_positive"])
         self.assertEqual(resp.json()["decision"], "clear")
@@ -215,17 +219,21 @@ class ApiTests(unittest.TestCase):
     def test_decision_rejects_false_positive_without_decision_clear(self) -> None:
         txn_id = "TXN-AF493E2FCD007CAD"
         self.client.get(f"/cases/{txn_id}")
-        resp = self.client.post("/decisions", json={
-            "txn_id": txn_id, "decision": "block", "is_false_positive": True,
-        })
+        resp = self.client.post(
+            "/decisions",
+            json={"txn_id": txn_id, "decision": "block", "is_false_positive": True},
+            headers=self._auth_headers(),
+        )
         self.assertEqual(resp.status_code, 400)
 
     def test_decision_rejects_false_positive_on_a_never_flagged_case(self) -> None:
         txn_id = "TXN-E3A14F5D6ED5855D"  # deterministic normal-pattern (clear) transaction
         self.client.get(f"/cases/{txn_id}")
-        resp = self.client.post("/decisions", json={
-            "txn_id": txn_id, "decision": "clear", "is_false_positive": True,
-        })
+        resp = self.client.post(
+            "/decisions",
+            json={"txn_id": txn_id, "decision": "clear", "is_false_positive": True},
+            headers=self._auth_headers(),
+        )
         self.assertEqual(resp.status_code, 400)
 
     def test_case_detail_exposes_analyst_decision_and_false_positive_flag(self) -> None:
@@ -235,10 +243,11 @@ class ApiTests(unittest.TestCase):
         self.assertIsNone(before["analyst_decision"])
         self.assertFalse(before["is_false_positive"])
 
-        self.client.post("/decisions", json={
-            "txn_id": txn_id, "decision": "clear", "analyst": "fp-test-analyst-2",
-            "is_false_positive": True,
-        })
+        self.client.post(
+            "/decisions",
+            json={"txn_id": txn_id, "decision": "clear", "is_false_positive": True},
+            headers=self._auth_headers(),
+        )
         after = self.client.get(f"/cases/{txn_id}").json()
         self.assertEqual(after["analyst_decision"], "clear")
         self.assertTrue(after["is_false_positive"])
