@@ -52,6 +52,21 @@ Detection alone isn't the product — what happens next is:
   carrying the exact triggering scores), and any analyst decision reverses it immediately and
   permanently — a case is never final without a human able to override it. See
   `fraudlens/core/cases/autonomous_action.py`.
+- **Autonomous account-level velocity restriction.** A second, real consequence beyond holding one
+  case: when a case clears the auto-hold bar, its *account* is placed under a temporary velocity
+  restriction — `VelocityAgent` checks this on every future score for that account and applies
+  materially tighter burst thresholds while it's active. A genuine cross-agent effect (the graph/DNA
+  agents' finding on one transaction changes how the velocity agent treats the *next* one for the
+  same account), not just a wider label. Always reversible the instant a human decides the
+  triggering case, logged as its own audit event. See `fraudlens/core/cases/account_restriction.py`.
+- **Analyst authentication.** Real JWT-based login (PBKDF2-hashed passwords, seeded demo accounts
+  plus self-serve signup) — every decision's `analyst` field comes from the authenticated session,
+  never client-supplied text. See `fraudlens/core/auth/`.
+- **Live transaction feed.** `/live` streams the real pipeline over Server-Sent Events — each
+  transaction is ingested and analyzed live (`runtime.analyze()`, the same call every other route
+  uses, not a pre-computed lookup), with each of the six agents' scores revealed as they're
+  computed, then the ensemble decision, then any autonomous action it triggers. See
+  `fraudlens/api/routes/live.py`.
 - **Regulatory reference context.** A dedicated module maps each case's severity (and, for
   cyber-enabled patterns like account takeover or device-farm fraud, its typology) to three real
   Indian frameworks: the **RBI Master Directions on Fraud Risk Management**, **PMLA 2002 §12**
@@ -139,16 +154,21 @@ flowchart LR
 
 ## Product
 
-A working analyst console, not a mockup — nine real pages, every one wired to a live API call:
+A working analyst console, not a mockup — behind a real login, ten real pages, every one wired to
+a live API call:
 
 - **Landing** (`/`) — the product's front door; even its "live" preview numbers (critical alert
   count, agent averages) are pulled from the real API at render time, not hardcoded.
+- **Login / Signup** (`/login`, `/signup`) — real JWT auth gating every console route.
+- **Live Feed** (`/live`) — the ingest → score → decide pipeline streamed over SSE as it happens,
+  each of the six agents' scores revealed as they're actually computed.
 - **Dashboard** (`/dashboard`) — aggregate risk counts, a per-day risk trend, agent performance,
-  recent alerts.
+  restricted-account count, recent alerts.
 - **Alert Feed** (`/feed`) — recent transactions sorted by risk, plain-language reason first.
-- **Investigation** (`/case`) — leads with the recommendation and confidence (and an **AUTO-HELD**
-  badge when the autonomous-action layer fired), then agent evidence, graph/ring evidence and
-  Fraud DNA match, an Ask Copilot panel, and a decision form that writes back through the real API.
+- **Investigation** (`/case`) — leads with the recommendation and confidence (with **AUTO-HELD**
+  and **ACCOUNT RESTRICTED** badges when the autonomy layer fired), then agent evidence, graph/ring
+  evidence and Fraud DNA match, an Ask Copilot panel, and a decision form that writes back through
+  the real, authenticated API.
 - **Investigations** (`/cases`) — every analyzed case, richer per-signal detail than the feed.
 - **Fraud Network** (`/network`) — cross-case ring summary plus the real, masked graph for the
   top ring.
@@ -165,14 +185,18 @@ red/amber/green reserved strictly for risk states, plain language before evidenc
 
 ## Engineering quality
 
-- **247 backend tests, all green** (248 with the optional ULB validation downloaded) — schemas,
+- **277 backend tests, all green** (278 with the optional ULB validation downloaded) — schemas,
   all six scoring signals, ensemble math (including the abstain-vs-vote distinction that keeps
   Fraud DNA from wrongly dragging down non-ring transactions), case orchestration, graph/ring
   detection, Fraud DNA matching and library growth, the autonomous-action conjunction (each signal
-  individually insufficient, all three together sufficient, reversal survives re-analysis),
-  regulatory-context hedging, PDF generation (including a real font-encoding regression for ₹
-  symbols in agent reason strings), decision workflow, report generation, the four new system-wide
-  console endpoints, and full API integration tests hitting a live server, not just in-process
+  individually insufficient, all three together sufficient, reversal survives re-analysis), the
+  account-restriction lifecycle (applied, changes real velocity scoring, reversed by a human, all
+  end to end against the live API), analyst auth (password hashing, JWT issuance/expiry, decisions
+  rejected without a valid session), the live SSE feed (real agent scores, matches a direct case
+  lookup, wraps around the dataset cleanly), regulatory-context hedging, PDF generation (including
+  a real font-encoding regression for ₹ symbols in agent reason strings), decision workflow, report
+  generation, the system-wide console endpoints, and full API integration tests hitting a live server,
+  not just in-process
   mocks.
 - **Test isolation**: the suite writes every persisted file (cases, decisions, audit log, Fraud DNA
   library) to a throwaway temp directory instead of the same files the live demo server reads —
@@ -201,7 +225,7 @@ red/amber/green reserved strictly for risk states, plain language before evidenc
 # Backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m unittest discover -s tests        # 247 tests, isolated temp data files
+python -m unittest discover -s tests        # 277 tests, isolated temp data files
 python scripts/run_demo.py                  # a real transaction through every agent
 uvicorn fraudlens.api.main:app --reload --port 8001
 
@@ -212,6 +236,7 @@ export GROQ_API_KEY="gsk_..."               # /copilot/chat returns a clean 503 
 cd frontend
 npm install
 npm run dev                                 # http://localhost:3000
+# Sign in at /login — seeded accounts: asharma / riyer, password fraudlens123
 
 # Optional: external validation on real data (see fraudlens/evaluation/validate_ulb.py)
 curl -o fraudlens/data/external/creditcard_ulb.csv \
