@@ -162,7 +162,7 @@ class CopilotTools:
         if case is not None:
             return case, None
         try:
-            case = self._runtime.engine.analyze(txn_id)
+            case = self._runtime.analyze(txn_id)
         except ValueError:
             return None, {"found": False, "error": f"No transaction found with ID '{txn_id}'."}
         return case, None

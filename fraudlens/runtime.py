@@ -20,7 +20,7 @@ from fraudlens.core.scoring.ml_agent import MLAgent
 from fraudlens.core.scoring.rule_agent import RuleAgent
 from fraudlens.core.scoring.velocity_agent import VelocityAgent
 from fraudlens.data.synthetic_generator import generate_synthetic_transactions
-from fraudlens.models.schemas import Transaction
+from fraudlens.models.schemas import FraudCase, Transaction
 
 
 @dataclass(frozen=True)
@@ -42,6 +42,15 @@ class FraudLensRuntime:
 
     def transaction(self, txn_id: str) -> Transaction | None:
         return next((t for t in self.transactions if t.txn_id == txn_id), None)
+
+    def analyze(self, txn_id: str) -> FraudCase:
+        """engine.analyze() plus recording any autonomous action it
+        triggers as its own audit event. Every route should call this
+        instead of `engine.analyze()` directly, so the audit trail doesn't
+        depend on which endpoint happened to touch the case first."""
+        case = self.engine.analyze(txn_id)
+        self.decision_workflow.record_autonomous_action(case)
+        return case
 
 
 def build_runtime(config: RuntimeConfig | None = None) -> FraudLensRuntime:

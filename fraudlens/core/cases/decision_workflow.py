@@ -19,6 +19,7 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
+from fraudlens.core.cases.autonomous_action import AUTO_HOLD_ACTION
 from fraudlens.models.schemas import AnalystDecision, AuditEvent, Decision, FraudCase
 
 _VALID_DECISIONS = {d.value for d in Decision}
@@ -78,6 +79,19 @@ class DecisionWorkflow:
         is_override = decision != case.decision.value
         high_risk_override = self.is_high_risk_override(case, decision)
 
+        # A human decision always reverses a system auto-hold, cleanly and
+        # permanently — this is what keeps "autonomy within limits" true:
+        # the case is never final without a human able to undo it. Mutates
+        # the same FraudCase object CaseEngine holds (analyze() preserves
+        # this reversal on every future re-analysis of the same case), so
+        # every later reader of case.system_action sees it cleared too.
+        reversed_autonomous_action = (
+            case.system_action == AUTO_HOLD_ACTION and case.system_action_overridden_at is None
+        )
+        if reversed_autonomous_action:
+            case.system_action = None
+            case.system_action_overridden_at = _now_iso()
+
         record = AnalystDecision(
             id=self._next_decision_id,
             case_id=case.case_id,
@@ -102,11 +116,46 @@ class DecisionWorkflow:
             audit_metadata["high_risk_override"] = True
             audit_metadata["ring_id"] = case.graph_evidence.ring_id
             audit_metadata["ring_size"] = case.graph_evidence.ring_size
+        if reversed_autonomous_action:
+            audit_metadata["reversed_autonomous_action"] = AUTO_HOLD_ACTION
         self._log_event(
             case.case_id, case.txn_id, "analyst_decision", analyst or "unknown", audit_metadata
         )
 
         return record
+
+    def record_autonomous_action(self, case: FraudCase) -> Optional[AuditEvent]:
+        """Log the system's own auto-hold as its own distinct, fully
+        explainable audit event — event_type="autonomous_action",
+        actor="system", never folded into "analyst_decision" or
+        "case_created". Records the exact scores that triggered it so the
+        decision is inspectable after the fact, not a silent action.
+
+        No-op when the case didn't trigger a hold, and idempotent per case
+        (CaseEngine.analyze() re-runs on every GET /cases/{txn_id}, so this
+        must not spam the audit trail with a duplicate event on every
+        request for the same held case).
+        """
+        if case.system_action != AUTO_HOLD_ACTION:
+            return None
+        if any(
+            e.case_id == case.case_id and e.event_type == "autonomous_action"
+            for e in self._audit_events
+        ):
+            return None
+
+        metadata: dict = {
+            "system_action": case.system_action,
+            "engine_decision": case.decision.value,
+            "final_score": case.final_score,
+            "confidence": case.confidence,
+        }
+        if case.fraud_dna_match is not None:
+            metadata["fraud_dna_similarity_score"] = case.fraud_dna_match.similarity_score
+
+        return self._log_event(
+            case.case_id, case.txn_id, "autonomous_action", "system", metadata
+        )
 
     def get_decision(self, case_id: str) -> Optional[AnalystDecision]:
         return self._decisions.get(case_id)

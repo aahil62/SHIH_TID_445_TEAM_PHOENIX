@@ -133,6 +133,34 @@ class ReportGeneratorTests(unittest.TestCase):
         pdf_bytes = self.generator.generate_pdf(case)
         self.assertTrue(pdf_bytes.startswith(b"%PDF"))
 
+    def test_block_and_report_gets_regulatory_context(self) -> None:
+        report = self.generator.generate(_sample_case(decision=Decision.BLOCK_AND_REPORT))
+        self.assertTrue(report.regulatory_context)
+        self.assertIn("Regulatory Context", report.report_text)
+        self.assertIn("Prevention of Money Laundering Act", report.report_text)
+        self.assertIn("not a record of any actual regulatory filing", report.report_text)
+
+    def test_clear_case_has_no_regulatory_context(self) -> None:
+        report = self.generator.generate(_sample_case(decision=Decision.CLEAR))
+        self.assertEqual(report.regulatory_context, [])
+        self.assertNotIn("Regulatory Context", report.report_text)
+
+    def test_auto_held_case_surfaces_autonomous_action_section(self) -> None:
+        case = _sample_case()
+        case.final_score = 0.95
+        case.confidence = 0.9
+        case.system_action = "auto_held"
+        report = self.generator.generate(case)
+        self.assertEqual(report.system_action, "auto_held")
+        self.assertIn("Autonomous Action", report.report_text)
+        self.assertIn("held pending review", report.report_text)
+        self.assertIn("no real transaction was stopped", report.report_text)
+
+    def test_non_held_case_omits_autonomous_action_section(self) -> None:
+        report = self.generator.generate(_sample_case())
+        self.assertIsNone(report.system_action)
+        self.assertNotIn("Autonomous Action", report.report_text)
+
 
 if __name__ == "__main__":
     unittest.main()
