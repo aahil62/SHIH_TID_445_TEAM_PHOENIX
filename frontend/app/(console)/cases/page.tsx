@@ -9,7 +9,7 @@ export default async function CasesPage() {
     <div className="mx-auto max-w-3xl px-6 py-6">
       <div className="mb-5 flex items-baseline justify-between">
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: "var(--foreground)" }}>
-          CASES
+          Investigations
         </h1>
         <span className="text-xs" style={{ color: "var(--muted)" }}>
           {sorted.length} case{sorted.length === 1 ? "" : "s"} on record, highest risk first

@@ -33,7 +33,7 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center px-6" style={{ color: "var(--foreground)" }}>
       <div
-        className="w-full max-w-sm rounded-[var(--radius-panel)] border p-7 backdrop-blur-xl"
+        className="w-full max-w-sm rounded-[var(--radius-panel)] border p-7 glass"
         style={{ borderColor: "var(--border)", backgroundColor: "var(--panel)", boxShadow: "var(--shadow-panel-raised)" }}
       >
         <div className="mb-6 flex items-center gap-2">

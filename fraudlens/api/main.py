@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fraudlens.api.case_cache import all_cases
 from fraudlens.api.routes.auth import router as auth_router
 from fraudlens.api.routes.cases import router as cases_router
 from fraudlens.api.routes.console import router as console_router
@@ -28,6 +29,12 @@ from fraudlens.runtime import build_runtime
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state.runtime = build_runtime()
+    # Warm the shared analyzed-case cache (case_cache.py) here, at boot,
+    # not on whichever request happens to hit it first — analyzing the
+    # full ~1,000-transaction dataset takes real time (six agents per
+    # transaction), and that cost should land before the app reports
+    # ready, never as a multi-second hang on someone's first click.
+    all_cases(state.runtime)
     yield
 
 

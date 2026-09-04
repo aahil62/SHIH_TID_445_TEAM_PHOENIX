@@ -58,7 +58,7 @@ export default async function NetworkPage() {
               <Link
                 key={r.ring_id}
                 href={`/case?txn_id=${encodeURIComponent(r.txn_id)}`}
-                className="flex items-center justify-between rounded-[var(--radius-control)] border px-3 py-2 text-xs transition-colors"
+                className="hover-lift flex items-center justify-between rounded-[var(--radius-control)] border px-3 py-2 text-xs"
                 style={{ borderColor: "var(--border)" }}
               >
                 <span className="font-mono" style={{ color: "var(--foreground)" }}>{r.ring_id}</span>

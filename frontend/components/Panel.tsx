@@ -15,13 +15,13 @@ export default function Panel({
 }) {
   return (
     <section
-      className="rounded-[var(--radius-panel)] border px-5 py-4 backdrop-blur-xl"
+      className="glass rounded-[var(--radius-panel)] border px-5 py-4"
       style={{
-        borderColor: "var(--border)",
-        backgroundColor: "var(--panel)",
+        borderColor: accent ? `color-mix(in srgb, ${accent} 40%, var(--border))` : "var(--border)",
+        background: accent
+          ? `linear-gradient(180deg, color-mix(in srgb, ${accent} 9%, transparent), transparent 55%), var(--panel)`
+          : "var(--panel)",
         boxShadow: raised ? "var(--shadow-panel-raised)" : "var(--shadow-panel)",
-        borderLeftWidth: accent ? "3px" : undefined,
-        borderLeftColor: accent,
       }}
     >
       <h2
