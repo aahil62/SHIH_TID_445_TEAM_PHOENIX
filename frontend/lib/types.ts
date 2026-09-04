@@ -152,3 +152,24 @@ export interface PerformanceStats {
   ml_feature_importances: Record<string, number>;
   external_validation: ExternalValidation | null;
 }
+
+// ── Copilot (POST /copilot/chat) ────────────────────────────────────────────
+// tool_calls is the audit trail proving the answer traces back to a real
+// backend call — see fraudlens/core/copilot/agent.py. Always render it.
+
+export interface CopilotToolCall {
+  tool: string;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+}
+
+export interface CopilotChatRequest {
+  question: string;
+  txn_id?: string;
+}
+
+export interface CopilotChatResponse {
+  answer: string;
+  tool_calls: CopilotToolCall[];
+  grounded: boolean;
+}

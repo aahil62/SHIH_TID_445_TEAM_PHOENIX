@@ -1,6 +1,8 @@
 import type {
   Case,
   CaseGraphResponse,
+  CopilotChatRequest,
+  CopilotChatResponse,
   DecisionSubmission,
   HealthResponse,
   PerformanceStats,
@@ -60,4 +62,35 @@ export function getHealth() {
 
 export function getPerformanceStats() {
   return apiFetch<PerformanceStats>(`/stats/performance`);
+}
+
+/** Carries the real HTTP status and the backend's own `detail` message —
+ * /copilot/chat returns a clean 503 (key not configured) or 502 (live LLM
+ * call failed) with a real explanation in both cases, and the chat panel
+ * needs to show that real message rather than a generic failure string. */
+export class CopilotApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "CopilotApiError";
+    this.status = status;
+  }
+}
+
+export async function sendCopilotMessage(payload: CopilotChatRequest): Promise<CopilotChatResponse> {
+  const res = await fetch(`${API_BASE}/copilot/chat`, {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    const detail =
+      data && typeof data === "object" && "detail" in data && typeof data.detail === "string"
+        ? data.detail
+        : `Copilot request failed (${res.status}).`;
+    throw new CopilotApiError(res.status, detail);
+  }
+  return data as CopilotChatResponse;
 }
