@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-/** Only ALERTS (/feed) and CASES (/cases) are backed by real API data —
- * see DESIGN-AUDIT.md's 2026-09-04 addendum. The rest render as visually
- * present but disabled "coming soon" — never linked to fabricated
- * content. */
+/** OVERVIEW (real aggregate stats, GET /cases), CASES, and ALERTS are
+ * backed by real API data — see DESIGN-AUDIT.md's 2026-09-04 addendum.
+ * The rest render as visually present but disabled "coming soon" —
+ * never linked to fabricated content. */
 const SECTIONS: { label: string; href: string | null }[] = [
-  { label: "OVERVIEW", href: null },
+  { label: "OVERVIEW", href: "/overview" },
   { label: "CASES", href: "/cases" },
   { label: "ALERTS", href: "/feed" },
   { label: "GRAPH", href: null },
