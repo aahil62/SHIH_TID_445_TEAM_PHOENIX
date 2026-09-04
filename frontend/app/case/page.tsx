@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCase, getCaseGraph } from "@/lib/api";
+import CopilotChat from "@/components/CopilotChat";
 import DecisionForm from "@/components/DecisionForm";
 import FraudRingGraph from "@/components/FraudRingGraph";
 import MaskedId from "@/components/MaskedId";
@@ -195,7 +196,14 @@ export default async function CasePage({
           )}
         </Panel>
 
-        {/* 6. DECISION */}
+        {/* 6. ASK COPILOT — pre-filled with this transaction's ID so a
+            question like "why was this flagged?" needs no typing beyond
+            the question itself. */}
+        <Panel title="Ask Copilot">
+          <CopilotChat txnId={caseDetail.txn_id} />
+        </Panel>
+
+        {/* 7. DECISION */}
         <Panel title="Decision">
           <DecisionForm txnId={caseDetail.txn_id} currentDecision={caseDetail.decision} />
         </Panel>
