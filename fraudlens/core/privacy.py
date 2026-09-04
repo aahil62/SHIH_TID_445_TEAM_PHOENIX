@@ -4,9 +4,10 @@ on raw data; nothing outward-facing should."""
 
 from __future__ import annotations
 
-from typing import Any
+import hashlib
+from typing import Any, Optional
 
-from fraudlens.models.schemas import FraudCase, Transaction
+from fraudlens.models.schemas import FraudCase, FraudGraph, Transaction
 
 
 def mask_identifier(value: str, visible: int = 4) -> str:
@@ -53,3 +54,50 @@ def public_case(case: FraudCase) -> dict[str, Any]:
         ge["shared_devices"] = [mask_identifier(v) for v in case.graph_evidence.shared_devices]
         ge["shared_ips"] = [mask_ip(v) for v in case.graph_evidence.shared_ips]
     return data
+
+
+def public_fraud_graph(graph: FraudGraph, flagged_node_id: Optional[str]) -> dict[str, Any]:
+    """Masks a FraudGraph for the frontend's fraud-ring graph view.
+
+    Node labels are masked exactly like public_case() already masks
+    graph_evidence — mask_identifier for account/device/merchant,
+    mask_ip for ip. node_id itself is NOT just masked, it's replaced
+    entirely: internal node ids embed the raw identifier verbatim (e.g.
+    "account:ACC-00110" from GraphBuilder), so returning them as-is would
+    leak a raw identifier even with the label masked. Every node id and
+    edge source/target is replaced with a one-way SHA1-derived opaque id
+    instead, which the frontend can still use to match nodes to edges
+    (and to flagged_node_id) but can never reverse into the original
+    value.
+    """
+    id_map: dict[str, str] = {
+        n.node_id: hashlib.sha1(n.node_id.encode()).hexdigest()[:12] for n in graph.nodes
+    }
+
+    nodes = []
+    for n in graph.nodes:
+        label = mask_ip(n.label) if n.node_type == "ip" else mask_identifier(n.label)
+        nodes.append({
+            "id": id_map[n.node_id],
+            "node_type": n.node_type,
+            "label": label,
+            "is_suspicious": n.is_suspicious,
+        })
+
+    edges = [
+        {
+            "source": id_map[e.source],
+            "target": id_map[e.target],
+            "edge_type": e.edge_type,
+            "weight": e.weight,
+        }
+        for e in graph.edges
+    ]
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "ring_id": graph.ring_id,
+        "ring_size": graph.ring_size,
+        "flagged_node_id": id_map.get(flagged_node_id) if flagged_node_id else None,
+    }

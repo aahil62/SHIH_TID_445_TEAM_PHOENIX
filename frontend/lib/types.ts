@@ -76,6 +76,42 @@ export interface DecisionSubmission {
   notes?: string;
 }
 
+// ── Fraud-ring graph (GET /cases/{txn_id}/graph) ────────────────────────────
+// Node ids/labels are already masked/opaque server-side — see
+// fraudlens/core/privacy.py's public_fraud_graph(). Never a raw identifier.
+
+export interface GraphNodePublic {
+  id: string;
+  node_type: "account" | "device" | "ip" | "merchant";
+  label: string;
+  is_suspicious: boolean;
+}
+
+export interface GraphEdgePublic {
+  source: string;
+  target: string;
+  edge_type: "uses_device" | "uses_ip" | "transacts_with";
+  weight: number;
+}
+
+export interface CaseGraph {
+  nodes: GraphNodePublic[];
+  edges: GraphEdgePublic[];
+  ring_id: string | null;
+  ring_size: number;
+  flagged_node_id: string | null;
+}
+
+export interface CaseGraphResponse {
+  graph: CaseGraph | null;
+}
+
+export interface HealthResponse {
+  status: string;
+}
+
+// ── Model-performance panel (GET /stats/performance) ───────────────────────
+
 export interface AgentPerformance {
   precision: number;
   recall: number;

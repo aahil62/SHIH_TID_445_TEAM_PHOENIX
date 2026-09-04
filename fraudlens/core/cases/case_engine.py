@@ -32,6 +32,7 @@ from fraudlens.models.schemas import (
     FraudCase,
     FraudDNAMatch,
     FraudDNAProfile,
+    FraudGraph,
     GraphEvidence,
     Transaction,
 )
@@ -137,6 +138,24 @@ class CaseEngine:
         profile.description = f"Analyst-confirmed fraud from {txn_id}: {profile.description}"
         self._dna_store.add(profile)
         return profile
+
+    def get_fraud_graph(self, txn_id: str) -> tuple[FraudGraph, str] | None:
+        """The real node/edge graph for a transaction's detected ring, plus
+        the node id of the transaction's own account (for highlighting it).
+        None when there's no detected ring — used by GET
+        /cases/{txn_id}/graph, never by scoring (this is presentation
+        data only, computed from the same GraphBuilder _build_graph_evidence
+        already uses)."""
+        try:
+            graph = self._graph_builder.get_ring_graph(txn_id)
+        except ValueError:
+            return None
+        if graph is None:
+            return None
+        flagged = self._graph_builder.flagged_account_node_id(txn_id)
+        if flagged is None:
+            return None
+        return graph, flagged
 
     def get_case(self, case_id: str) -> FraudCase | None:
         return self._cases.get(case_id)

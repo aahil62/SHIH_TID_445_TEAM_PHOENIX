@@ -116,13 +116,8 @@ class GraphBuilder:
         if ring_id is None or ring_size < 2:
             return None
 
-        node_by_id = {n.node_id: n for n in sub_nodes}
-
-        ring_edges = [e for e in sub_edges if e.source in ring_accounts or e.target in ring_accounts]
-        ring_node_ids = set(ring_accounts)
-        for e in ring_edges:
-            ring_node_ids.add(e.target if e.source in ring_accounts else e.source)
-        ring_nodes = [n for n in sub_nodes if n.node_id in ring_node_ids]
+        ring_nodes, ring_edges = self._scope_to_ring(sub_nodes, sub_edges, ring_accounts)
+        node_by_id = {n.node_id: n for n in ring_nodes}
 
         connected_accounts = sorted(n.label for n in ring_nodes if n.node_type == NODE_ACCOUNT)
         shared_devices = sorted(
@@ -162,6 +157,40 @@ class GraphBuilder:
             graph_density=round(graph_density, 4),
             evidence_summary=evidence_summary,
         )
+
+    def get_ring_graph(self, txn_id: str, depth: int = 2) -> Optional[FraudGraph]:
+        """The real node/edge structure for a transaction's detected ring —
+        same detection and same ring-scoping as get_graph_evidence(), just
+        returned as the raw graph instead of the flattened summary. None
+        when there's no detected ring (2+ accounts in one community)."""
+        sub_nodes, sub_edges, ring_id, ring_size, ring_accounts = self._bfs_and_detect(txn_id, depth)
+        if ring_id is None or ring_size < 2:
+            return None
+        ring_nodes, ring_edges = self._scope_to_ring(sub_nodes, sub_edges, ring_accounts)
+        return FraudGraph(nodes=ring_nodes, edges=ring_edges, ring_id=ring_id, ring_size=ring_size)
+
+    def flagged_account_node_id(self, txn_id: str) -> Optional[str]:
+        """The node id of the transaction's own account, so a caller can
+        identify which node in get_ring_graph()'s output to highlight."""
+        txn = self._txn_by_id.get(txn_id)
+        if txn is None:
+            return None
+        return _account_node_id(txn.account_id)
+
+    @staticmethod
+    def _scope_to_ring(
+        sub_nodes: list[GraphNode], sub_edges: list[GraphEdge], ring_accounts: frozenset[str]
+    ) -> tuple[list[GraphNode], list[GraphEdge]]:
+        """Restrict a BFS subgraph down to just the detected ring's own
+        accounts and whatever they touch — not the wider BFS neighborhood,
+        which may reach an unrelated cluster only via a weak bridge (see
+        graph/community.py)."""
+        ring_edges = [e for e in sub_edges if e.source in ring_accounts or e.target in ring_accounts]
+        ring_node_ids = set(ring_accounts)
+        for e in ring_edges:
+            ring_node_ids.add(e.target if e.source in ring_accounts else e.source)
+        ring_nodes = [n for n in sub_nodes if n.node_id in ring_node_ids]
+        return ring_nodes, ring_edges
 
     def _bfs_and_detect(
         self, txn_id: str, depth: int
