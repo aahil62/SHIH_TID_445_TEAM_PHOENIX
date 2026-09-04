@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const LINKS = [{ href: "/feed", label: "Alert Feed" }];
+const LINKS = [
+  { href: "/feed", label: "Alert Feed" },
+  { href: "/insights", label: "Model Performance" },
+];
 
 export default function NavRail() {
   const pathname = usePathname();

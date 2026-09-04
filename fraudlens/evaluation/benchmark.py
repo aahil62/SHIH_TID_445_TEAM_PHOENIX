@@ -168,6 +168,9 @@ def run_benchmark(
         },
         "agents": agent_results,
         "ensemble": ensemble_metrics,
+        # What the trained model actually weighs — the already-fitted
+        # ml_agent from `agents` above, no second GBM fit needed.
+        "ml_feature_importances": agents["ml_agent"].feature_importances,
     }
 
 

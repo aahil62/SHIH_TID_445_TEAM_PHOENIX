@@ -1,4 +1,9 @@
-import type { Case, DecisionSubmission, RecentTransaction } from "./types";
+import type {
+  Case,
+  DecisionSubmission,
+  PerformanceStats,
+  RecentTransaction,
+} from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8001";
 
@@ -29,4 +34,8 @@ export function submitDecision(payload: DecisionSubmission) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function getPerformanceStats() {
+  return apiFetch<PerformanceStats>(`/stats/performance`);
 }
