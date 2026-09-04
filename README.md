@@ -14,6 +14,12 @@ FraudLens doesn't just answer "is this transaction risky?" It answers: what patt
 belong to, have we seen it before, who — or what — should act on it, and under what regulatory
 framework does that action fall?
 
+## Live demo
+
+- **Console:** https://fraud-lens.vercel.app — sign in with the seeded accounts below
+- **API:** deployed on Render (see `render.yaml`); the frontend talks to it via `NEXT_PUBLIC_API_BASE`
+- Seeded accounts: `asharma` / `riyer`, password `fraudlens123`
+
 ## What it does
 
 A transaction enters the system and is independently evaluated by **six scoring agents**, each
@@ -83,10 +89,13 @@ Detection alone isn't the product — what happens next is:
 - **Copilot.** A tool-calling chat assistant grounded entirely in real case data — the LLM only
   ever picks from a whitelisted tool name; the tool's real `CaseEngine` output is the only source
   of fact; a second call just paraphrases that JSON, so it's structurally resistant to
-  hallucinating evidence that doesn't exist. Ships fully built and tested (`fraudlens/core/copilot/`,
-  the "Ask Copilot" panel on every case) — **currently blocked** on the team's Groq account
-  rejecting every model with `model_not_found`; the route itself returns a clean, real error
-  (502/503) rather than a fake answer when that happens.
+  hallucinating evidence that doesn't exist. On an unknown transaction, the refusal text comes
+  straight from the tool's own error — the LLM is never even called on that path. Live and verified
+  end to end against a real Groq key (`fraudlens/core/copilot/`, the "Ask Copilot" panel on every
+  case). One real bug found and fixed along the way: Groq decommissioned this app's default model
+  mid-build, and its recommended replacement occasionally mis-rendered ₹ as a different currency
+  symbol while paraphrasing — corrected with a deterministic regex, not just a prompt instruction,
+  since trusting the model to always get it right isn't good enough here.
 
 ## Results
 
@@ -154,8 +163,8 @@ flowchart LR
 
 ## Product
 
-A working analyst console, not a mockup — behind a real login, ten real pages, every one wired to
-a live API call:
+A working analyst console, not a mockup — behind a real login, thirteen real pages, every one
+wired to a live API call:
 
 - **Landing** (`/`) — the product's front door; even its "live" preview numbers (critical alert
   count, agent averages) are pulled from the real API at render time, not hardcoded.
@@ -171,7 +180,10 @@ a live API call:
   the real, authenticated API.
 - **Investigations** (`/cases`) — every analyzed case, richer per-signal detail than the feed.
 - **Fraud Network** (`/network`) — cross-case ring summary plus the real, masked graph for the
-  top ring.
+  top ring, with an "Open Full View" link into the dedicated explorer below.
+- **Network Explorer** (`/network/explore`) — a full-screen version of the same ring graph with
+  search, zoom, and click-to-focus on a node's neighborhood; opens in context from a specific case
+  or ring (`?txn_id=` / `?ring=`), not just a bare graph.
 - **Fraud DNA** (`/fraud-dna`) — the real 5-pattern seed library with honest per-pattern match
   counts derived from analyzed cases (a pattern with zero real matches shows "0 matches," never a
   fabricated number).
@@ -179,13 +191,16 @@ a live API call:
 - **Audit Trail** (`/audit`) — a global, cross-case log with plain-language event text.
 - **Performance** (`/insights`) — the benchmark and ULB external-validation numbers, live.
 
-Design system: dark "forensic terminal" theme — near-black canvas, translucent glass panels,
-emerald for primary actions and the accent identity, amber reserved for Fraud DNA/network content,
-red/amber/green reserved strictly for risk states, plain language before evidence.
+Design system: dark "forensic terminal" theme — near-black canvas, a real physical-glass material
+(blur + saturation, layered shadows, never a flat blur), emerald for primary actions and the accent
+identity, amber reserved for Fraud DNA/network content, red/amber/green reserved strictly for risk
+states. Instrument Sans carries all UI text and headings; Space Mono is reserved for identifiers,
+scores, amounts, and timestamps — never mixed. Full spec in `DESIGN.md`; strategic/brand context in
+`PRODUCT.md`.
 
 ## Engineering quality
 
-- **277 backend tests, all green** (278 with the optional ULB validation downloaded) — schemas,
+- **298 backend tests, all green** (299 with the optional ULB validation downloaded) — schemas,
   all six scoring signals, ensemble math (including the abstain-vs-vote distinction that keeps
   Fraud DNA from wrongly dragging down non-ring transactions), case orchestration, graph/ring
   detection, Fraud DNA matching and library growth, the autonomous-action conjunction (each signal
@@ -194,17 +209,24 @@ red/amber/green reserved strictly for risk states, plain language before evidenc
   end to end against the live API), analyst auth (password hashing, JWT issuance/expiry, decisions
   rejected without a valid session), the live SSE feed (real agent scores, matches a direct case
   lookup, wraps around the dataset cleanly), regulatory-context hedging, PDF generation (including
-  a real font-encoding regression for ₹ symbols in agent reason strings), decision workflow, report
-  generation, the system-wide console endpoints, and full API integration tests hitting a live server,
-  not just in-process
-  mocks.
+  a real font-encoding regression for ₹ symbols in agent reason strings), Copilot's tool-grounding
+  and currency-symbol correction, decision workflow, report generation, the system-wide console
+  endpoints, and full API integration tests hitting a live server, not just in-process mocks.
 - **Test isolation**: the suite writes every persisted file (cases, decisions, audit log, Fraud DNA
   library) to a throwaway temp directory instead of the same files the live demo server reads —
   running tests can no longer leak test-analyst names into a running demo's audit trail.
-- **Eleven pull requests, eleven clean merges** across parallel branches (core engine, rules/ML,
-  graph/Fraud DNA, frontend, Copilot + PDF export, autonomy + compliance) against a shared contract
-  defined once on `main` — main-only merges, always independently re-verified (fresh checkout,
-  full diff review, full test rerun) before merging, never trusting a branch's own report.
+- **Fifteen pull requests, fifteen clean merges** across parallel branches (core engine, rules/ML,
+  graph/Fraud DNA, frontend, Copilot + PDF export, autonomy + compliance, fraud-graph visualization,
+  the Groq model-deprecation fix) against a shared contract defined once on `main` — main-only
+  merges, always independently re-verified (fresh checkout, full diff review, full test rerun)
+  before merging, never trusting a branch's own report. One additional PR was opened and later
+  closed unmerged after its branch diverged too far from main to reconcile cheaply; the UI work it
+  proposed was rebuilt fresh directly against main instead.
+- **A real, measured performance bug found and fixed**: the recent-transactions feed was
+  re-running the full six-agent pipeline per transaction on every request (1.6s for 25
+  transactions, no caching) while every other console route already shared one process-level
+  cache — extracted that cache to `fraudlens/api/case_cache.py` and reused it (1.6s → 0.03s), and
+  moved its warm-up to server startup so a backend restart never stalls someone's first click.
 - **Frontend**: TypeScript, 5/5 Vitest tests, `npm run build` and lint both clean.
 - Every decision along the way was verified against real run output before being committed —
   including catching and fixing gaps found only by exercising the system live (a schema field two
@@ -215,9 +237,10 @@ red/amber/green reserved strictly for risk states, plain language before evidenc
 
 ## Tech stack
 
-**Backend:** Python, FastAPI, Pydantic, scikit-learn, NetworkX, fpdf2
-**Frontend:** Next.js (App Router), TypeScript, Tailwind CSS
+**Backend:** Python, FastAPI, Pydantic, scikit-learn, NetworkX, fpdf2, PyJWT
+**Frontend:** Next.js (App Router), TypeScript, Tailwind CSS, Instrument Sans + Space Mono
 **Testing:** `unittest` (backend), Vitest + React Testing Library (frontend)
+**Hosting:** frontend on Vercel, backend on Render (see Live demo below)
 
 ## Running it
 
@@ -225,12 +248,12 @@ red/amber/green reserved strictly for risk states, plain language before evidenc
 # Backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m unittest discover -s tests        # 277 tests, isolated temp data files
+python -m unittest discover -s tests        # 298 tests, isolated temp data files
 python scripts/run_demo.py                  # a real transaction through every agent
 uvicorn fraudlens.api.main:app --reload --port 8001
 
 # Optional: Copilot needs a Groq key (not required for anything else)
-export GROQ_API_KEY="gsk_..."               # /copilot/chat returns a clean 503 without it
+export GROQ_API_KEY="gsk_..."               # verified live end to end; a clean 503 without it
 
 # Frontend (separate terminal)
 cd frontend
