@@ -21,5 +21,15 @@ def chat(payload: CopilotRequest) -> dict:
     except CopilotError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
-    response = agent.answer(payload)
+    try:
+        response = agent.answer(payload)
+    except CopilotError as exc:
+        # The constructor only catches a *missing* key. A live LLM call
+        # failing for any other reason (invalid key, bad model name,
+        # network error, Groq-side error) raises here instead — this was
+        # previously uncaught, so any real-call failure surfaced as an
+        # opaque 500 with no message, even though CopilotError already
+        # carries the real reason.
+        raise HTTPException(status_code=502, detail=f"Copilot's LLM call failed: {exc}")
+
     return response.model_dump()

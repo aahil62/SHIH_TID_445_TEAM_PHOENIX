@@ -124,6 +124,24 @@ class ApiTests(unittest.TestCase):
             resp = self.client.post("/copilot/chat", json={"question": "why was this flagged?"})
         self.assertEqual(resp.status_code, 503)
 
+    def test_copilot_chat_live_call_failure_returns_clean_error_not_500(self) -> None:
+        # A KEY IS SET (constructor succeeds), but the actual live call to
+        # Groq fails (invalid key, bad model, network error — anything).
+        # This previously escaped the route's try/except entirely (it only
+        # wrapped the constructor) and surfaced as an opaque, undebuggable
+        # 500. Real regression test for the exact bug hit during live
+        # testing, not a hypothetical.
+        import httpx
+
+        with patch.dict(os.environ, {"GROQ_API_KEY": "fake-key-for-this-test"}):
+            with patch("fraudlens.core.copilot.agent.httpx.post") as mock_post:
+                mock_post.side_effect = httpx.ConnectError("simulated network failure")
+                resp = self.client.post(
+                    "/copilot/chat", json={"question": "why was this flagged?", "txn_id": "TXN-0001"}
+                )
+        self.assertEqual(resp.status_code, 502)
+        self.assertIn("Copilot's LLM call failed", resp.json()["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()
