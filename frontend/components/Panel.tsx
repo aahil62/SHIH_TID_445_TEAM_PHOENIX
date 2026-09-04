@@ -3,6 +3,7 @@ export default function Panel({
   children,
   accent,
   raised,
+  headerRight,
 }: {
   title: string;
   children: React.ReactNode;
@@ -12,6 +13,10 @@ export default function Panel({
   /** Slightly more visual weight for the single most important panel on
    * a page (e.g. the primary recommendation) — not for general use. */
   raised?: boolean;
+  /** Optional action(s) right-aligned in the header row next to the
+   * title — e.g. an "Open Full View" link. Doesn't change the panel's
+   * size, just uses the header space that's already there. */
+  headerRight?: React.ReactNode;
 }) {
   return (
     <section
@@ -24,12 +29,12 @@ export default function Panel({
         borderLeftColor: accent,
       }}
     >
-      <h2
-        className="mb-3 text-[11px] font-semibold uppercase tracking-wider"
-        style={{ color: "var(--muted)" }}
-      >
-        {title}
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+          {title}
+        </h2>
+        {headerRight}
+      </div>
       {children}
     </section>
   );
