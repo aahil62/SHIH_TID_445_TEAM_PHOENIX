@@ -25,19 +25,25 @@ PREFIX="${GROQ_KEY:0:4}"
 echo "Key prefix: $PREFIX (should read 'gsk_' — if it doesn't, the paste likely went wrong)"
 echo ""
 
+# llama-3.1-8b-instant and llama-3.3-70b-versatile were decommissioned by
+# Groq on 2026-08-16 (free/developer tier) — testing the models Groq
+# actually recommends as their replacements instead, per
+# https://console.groq.com/docs/deprecations. If Groq deprecates these in
+# turn, check that page again rather than assuming the model names below
+# are still current.
 echo "=== Testing directly against Groq (bypassing our app entirely) ==="
-echo "--- llama-3.1-8b-instant ---"
+echo "--- openai/gpt-oss-20b ---"
 SMALL_STATUS=$(curl -s -o /tmp/groq_test_small.json -w "%{http_code}" https://api.groq.com/openai/v1/chat/completions \
   -H "Authorization: Bearer $GROQ_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"llama-3.1-8b-instant","messages":[{"role":"user","content":"hi"}]}')
+  -d '{"model":"openai/gpt-oss-20b","messages":[{"role":"user","content":"hi"}]}')
 echo "Status: $SMALL_STATUS"
 
-echo "--- llama-3.3-70b-versatile ---"
+echo "--- openai/gpt-oss-120b ---"
 BIG_STATUS=$(curl -s -o /tmp/groq_test_big.json -w "%{http_code}" https://api.groq.com/openai/v1/chat/completions \
   -H "Authorization: Bearer $GROQ_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"hi"}]}')
+  -d '{"model":"openai/gpt-oss-120b","messages":[{"role":"user","content":"hi"}]}')
 echo "Status: $BIG_STATUS"
 echo ""
 
@@ -45,17 +51,21 @@ GROQ_MODEL_LINE=""
 if [ "$SMALL_STATUS" != "200" ] && [ "$BIG_STATUS" != "200" ]; then
   echo "=== Neither model worked. Groq itself is rejecting this key. ==="
   echo "This isn't a bug in the app — the direct test bypasses it entirely."
-  echo "Response body from the 70B test, for reference:"
+  echo "Response body from the 120B test, for reference:"
   cat /tmp/groq_test_big.json
   echo ""
   echo "Go to https://console.groq.com -> API Keys, generate a FRESH key"
   echo "(don't reuse this one), and re-run this script."
+  echo "If both requests fail with a model-related error (not an auth"
+  echo "error), Groq may have deprecated these models too — check"
+  echo "https://console.groq.com/docs/deprecations and update the model"
+  echo "names in this script and fraudlens/core/copilot/agent.py."
   rm -f /tmp/groq_test_small.json /tmp/groq_test_big.json
   exit 1
 elif [ "$BIG_STATUS" != "200" ]; then
-  echo "=== llama-3.3-70b-versatile isn't available on this key/account, but the 8B model works. ==="
-  echo "Using llama-3.1-8b-instant instead so Copilot has a working model."
-  GROQ_MODEL_LINE="GROQ_MODEL=llama-3.1-8b-instant"
+  echo "=== openai/gpt-oss-120b isn't available on this key/account, but the 20b model works. ==="
+  echo "Using openai/gpt-oss-20b instead so Copilot has a working model."
+  GROQ_MODEL_LINE="GROQ_MODEL=openai/gpt-oss-20b"
 else
   echo "=== Both models work. Key is genuinely valid. ==="
 fi

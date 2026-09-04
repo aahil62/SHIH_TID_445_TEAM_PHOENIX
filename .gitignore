@@ -26,3 +26,5 @@ fraudlens/data/external/
 .DS_Store
 .vscode/
 .idea/
+
+.env
