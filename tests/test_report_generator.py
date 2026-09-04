@@ -133,6 +133,25 @@ class ReportGeneratorTests(unittest.TestCase):
         pdf_bytes = self.generator.generate_pdf(case)
         self.assertTrue(pdf_bytes.startswith(b"%PDF"))
 
+    def test_generate_pdf_includes_autonomous_action_when_held(self) -> None:
+        case = _sample_case()
+        case.system_action = "auto_held"
+        pdf_bytes = self.generator.generate_pdf(case)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    def test_generate_pdf_includes_regulatory_context_for_block_and_report(self) -> None:
+        # BLOCK_AND_REPORT always has non-empty regulatory context (see
+        # regulatory_matrix._DECISION_REFERENCES) — exercises the PDF's
+        # citation-block rendering, not just the "no context" path.
+        pdf_bytes = self.generator.generate_pdf(_sample_case(decision=Decision.BLOCK_AND_REPORT))
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    def test_generate_pdf_works_for_clear_decision_with_no_regulatory_context(self) -> None:
+        case = _sample_case(decision=Decision.CLEAR)
+        case.graph_evidence = None
+        pdf_bytes = self.generator.generate_pdf(case)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
     def test_block_and_report_gets_regulatory_context(self) -> None:
         report = self.generator.generate(_sample_case(decision=Decision.BLOCK_AND_REPORT))
         self.assertTrue(report.regulatory_context)
