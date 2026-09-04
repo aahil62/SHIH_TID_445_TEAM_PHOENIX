@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -251,9 +252,26 @@ _SUMMARY_SYSTEM_PROMPT = (
     "score, decision, account detail, or piece of evidence that is not "
     "explicitly in the JSON, and never guess at anything the JSON does not "
     "cover. If the JSON says \"found\": false, or says nothing was detected, "
-    "say so plainly instead of speculating. Keep the answer to a few "
-    "sentences, plain language, no markdown."
+    "say so plainly instead of speculating. All amounts in this system are "
+    "Indian Rupees — when stating an amount, reproduce the number exactly "
+    "and prefix it with the rupee sign (₹), never $, £, €, or any other "
+    "currency symbol. Keep the answer to a few sentences, plain language, "
+    "no markdown."
 )
+
+# Belt-and-suspenders for the instruction above: FraudLens is an INR-only
+# system (every amount anywhere in this codebase is Indian Rupees), so a
+# non-rupee currency symbol immediately before a digit in the model's own
+# generated prose is never a legitimate different currency — observed live,
+# gpt-oss-120b occasionally mis-renders the ₹ glyph as £/₤ when paraphrasing
+# a source amount instead of quoting it verbatim. Deterministic correction,
+# not just a prompt instruction, matching this module's own "constrained,
+# not just prompted" design elsewhere.
+_WRONG_CURRENCY_SYMBOL = re.compile(r"[£$€₤¥₩₽](?=[\d,])")
+
+
+def _fix_currency_symbols(text: str) -> str:
+    return _WRONG_CURRENCY_SYMBOL.sub("₹", text)
 
 
 class GroqLLMClient:
@@ -384,5 +402,5 @@ class CopilotAgent:
                 tool_calls=[call_record],
             )
 
-        answer_text = self._llm.summarize(request.question, chosen.name, result)
+        answer_text = _fix_currency_symbols(self._llm.summarize(request.question, chosen.name, result))
         return CopilotResponse(answer=answer_text, tool_calls=[call_record])

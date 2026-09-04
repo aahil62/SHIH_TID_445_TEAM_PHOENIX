@@ -262,6 +262,24 @@ class CopilotAgentGroundingTests(_CopilotFixture):
         self.assertEqual(response.tool_calls[0].output, expected)
         self.assertTrue(response.grounded)
 
+    def test_wrong_currency_symbols_in_the_llms_prose_are_corrected(self) -> None:
+        # Observed live: gpt-oss-120b occasionally mis-renders the source
+        # data's real ₹ (confirmed present in the tool's own JSON output —
+        # see explain_decision's reason strings) as £/₤ when paraphrasing
+        # an amount into its own prose, instead of quoting it verbatim.
+        # FraudLens is INR-only, so this is corrected deterministically
+        # rather than trusted to prompting alone.
+        txn_id = self.ring_txns[0].txn_id
+        llm = _FakeLLMClient(chosen=ChosenTool(name="explain_decision", arguments={"txn_id": txn_id}))
+        llm.summary_text = "The amount was ₤342,829.13, well over the £150,000 threshold."
+        agent = CopilotAgent(self.runtime, llm_client=llm)
+
+        response = agent.answer(CopilotRequest(question="why was this flagged?", txn_id=txn_id))
+
+        self.assertEqual(response.answer, "The amount was ₹342,829.13, well over the ₹150,000 threshold.")
+        self.assertNotIn("₤", response.answer)
+        self.assertNotIn("£", response.answer)
+
     def test_unknown_transaction_never_reaches_the_llm_summarizer(self) -> None:
         llm = _FakeLLMClient(
             chosen=ChosenTool(name="query_transaction", arguments={"txn_id": "TXN-GHOST"})
