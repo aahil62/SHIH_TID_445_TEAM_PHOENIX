@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCase, getCaseGraph } from "@/lib/api";
 import CopilotChat from "@/components/CopilotChat";
 import DecisionForm from "@/components/DecisionForm";
-import FraudRingGraph from "@/components/FraudRingGraph";
+import FraudRingGraph, { OpenFullViewLink } from "@/components/FraudRingGraph";
 import MaskedId from "@/components/MaskedId";
 import Panel from "@/components/Panel";
 import SignalBar from "@/components/SignalBar";
@@ -184,13 +184,20 @@ export default async function CasePage({
         </Panel>
 
         {/* 4. FRAUD RING — real interactive graph, or an explicit empty state */}
-        <Panel title="Fraud ring">
+        <Panel
+          title="Fraud ring"
+          headerRight={
+            caseGraph ? (
+              <OpenFullViewLink href={`/network/explore?txn_id=${encodeURIComponent(caseDetail.txn_id)}`} />
+            ) : undefined
+          }
+        >
           {graph_evidence && (
             <p className="mb-3 text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
               {graph_evidence.evidence_summary}
             </p>
           )}
-          <FraudRingGraph graph={caseGraph} />
+          <FraudRingGraph graph={caseGraph} mode="compact" />
         </Panel>
 
         {/* 5. FRAUD DNA — only real content when present, explicit empty state when not */}

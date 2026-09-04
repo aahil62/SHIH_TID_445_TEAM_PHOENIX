@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCaseGraph, getNetworkSummary } from "@/lib/api";
-import FraudRingGraph from "@/components/FraudRingGraph";
+import FraudRingGraph, { OpenFullViewLink } from "@/components/FraudRingGraph";
 import Panel from "@/components/Panel";
 import StatCard from "@/components/StatCard";
 import { formatScore } from "@/lib/risk";
@@ -42,9 +42,14 @@ export default async function NetworkPage() {
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <Panel title={topRing ? `Ring ${topRing.ring_id}` : "No ring in view"}>
+        <Panel
+          title={topRing ? `Ring ${topRing.ring_id}` : "No ring in view"}
+          headerRight={
+            topRing ? <OpenFullViewLink href={`/network/explore?ring=${encodeURIComponent(topRing.ring_id)}`} /> : undefined
+          }
+        >
           {topRing ? (
-            <FraudRingGraph graph={graph} />
+            <FraudRingGraph graph={graph} mode="compact" />
           ) : (
             <p className="text-sm" style={{ color: "var(--muted)" }}>
               No fraud rings detected in the current dataset.
