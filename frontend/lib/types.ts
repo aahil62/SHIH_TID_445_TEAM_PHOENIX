@@ -76,12 +76,24 @@ export interface Case {
    * analyst records a decision on the case that triggered it. */
   account_restricted: boolean;
   created_at: string;
+  /** The analyst's own recorded decision, if any — distinct from
+   * `decision` above, which is always the engine's own recommendation
+   * and never changes once the case is analyzed. Null until an analyst
+   * has actually submitted one via POST /decisions. */
+  analyst_decision: Decision | null;
+  /** True only for a case the engine actually flagged (decision was
+   * review/block/block_and_report) that an analyst investigated and
+   * confirmed did NOT represent actual fraud — a distinct fact from a
+   * transaction that was simply never risky, which also shows
+   * decision="clear" but has this False. */
+  is_false_positive: boolean;
 }
 
 export interface DecisionSubmission {
   txn_id: string;
   decision: Decision;
   notes?: string;
+  is_false_positive?: boolean;
 }
 
 // ── Fraud-ring graph (GET /cases/{txn_id}/graph) ────────────────────────────

@@ -94,6 +94,15 @@ export default async function CasePage({
                 AUTO-HELD
               </span>
             )}
+            {caseDetail.is_false_positive && (
+              <span
+                className="rounded-[var(--radius-control)] px-2 py-0.5 text-[11px] font-bold tracking-wide"
+                style={{ backgroundColor: "var(--cobalt)", color: "var(--cobalt-foreground)" }}
+                title="This case was flagged by the engine, investigated, and confirmed to NOT represent actual fraud — distinct from a transaction that was simply never risky."
+              >
+                FALSE POSITIVE
+              </span>
+            )}
             {caseDetail.account_restricted && (
               <span
                 className="rounded-[var(--radius-control)] px-2 py-0.5 text-[11px] font-bold tracking-wide"

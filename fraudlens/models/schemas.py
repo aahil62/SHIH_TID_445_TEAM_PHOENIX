@@ -171,6 +171,13 @@ class AnalystDecision(BaseModel):
     notes: Optional[str] = None
     decided_at: str
     is_override: bool = False
+    # A flagged case (review/block/block_and_report) an analyst investigated
+    # and confirmed did NOT represent actual fraud — a distinct fact from
+    # `decision` itself (always "clear" when this is True; see
+    # DecisionWorkflow.submit_decision's validation), so a false-positive
+    # correction is never conflated with an ordinary clear that was never
+    # flagged in the first place. See fraudlens/core/cases/decision_workflow.py.
+    is_false_positive: bool = False
 
 
 class AuditEvent(BaseModel):
@@ -238,6 +245,7 @@ class FraudReport(BaseModel):
     recommended_action: str
     system_action: Optional[str] = None
     regulatory_context: list[RegulatoryReference] = Field(default_factory=list)
+    is_false_positive: bool = False
     report_status: str = "draft"
     generated_at: str = Field(default_factory=_now_iso)
     report_text: str = ""

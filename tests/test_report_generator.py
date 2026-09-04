@@ -133,6 +133,25 @@ class ReportGeneratorTests(unittest.TestCase):
         pdf_bytes = self.generator.generate_pdf(case)
         self.assertTrue(pdf_bytes.startswith(b"%PDF"))
 
+    def test_generate_pdf_includes_autonomous_action_when_held(self) -> None:
+        case = _sample_case()
+        case.system_action = "auto_held"
+        pdf_bytes = self.generator.generate_pdf(case)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    def test_generate_pdf_includes_regulatory_context_for_block_and_report(self) -> None:
+        # BLOCK_AND_REPORT always has non-empty regulatory context (see
+        # regulatory_matrix._DECISION_REFERENCES) — exercises the PDF's
+        # citation-block rendering, not just the "no context" path.
+        pdf_bytes = self.generator.generate_pdf(_sample_case(decision=Decision.BLOCK_AND_REPORT))
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    def test_generate_pdf_works_for_clear_decision_with_no_regulatory_context(self) -> None:
+        case = _sample_case(decision=Decision.CLEAR)
+        case.graph_evidence = None
+        pdf_bytes = self.generator.generate_pdf(case)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
     def test_block_and_report_gets_regulatory_context(self) -> None:
         report = self.generator.generate(_sample_case(decision=Decision.BLOCK_AND_REPORT))
         self.assertTrue(report.regulatory_context)
@@ -160,6 +179,72 @@ class ReportGeneratorTests(unittest.TestCase):
         report = self.generator.generate(_sample_case())
         self.assertIsNone(report.system_action)
         self.assertNotIn("Autonomous Action", report.report_text)
+
+    # ── False positive reporting ────────────────────────────────────────
+
+    def test_report_reflects_confirmed_false_positive(self) -> None:
+        decision = AnalystDecision(
+            id=1, case_id="CASE-TXN-RPT-001", txn_id="TXN-RPT-001",
+            decision="clear", analyst="jane", notes="Not fraud after review.",
+            decided_at="2026-09-03T15:00:00+00:00", is_override=True, is_false_positive=True,
+        )
+        report = self.generator.generate(_sample_case(), analyst_decision=decision)
+        self.assertTrue(report.is_false_positive)
+        self.assertIn("FALSE POSITIVE", report.report_text)
+        # Never ambiguous with a routine clear, and never the stale
+        # "PENDING" a real analyst decision should never show.
+        self.assertNotIn("PENDING", report.report_text)
+        self.assertIn("Confirmed false positive", report.report_text)
+
+    def test_report_without_false_positive_is_not_mislabeled(self) -> None:
+        decision = AnalystDecision(
+            id=1, case_id="CASE-TXN-RPT-001", txn_id="TXN-RPT-001",
+            decision="clear", analyst="jane", notes="Confirmed real fraud, downgraded anyway.",
+            decided_at="2026-09-03T15:00:00+00:00", is_override=True,
+        )
+        report = self.generator.generate(_sample_case(), analyst_decision=decision)
+        self.assertFalse(report.is_false_positive)
+        self.assertNotIn("FALSE POSITIVE", report.report_text)
+
+    def test_generate_pdf_works_with_false_positive(self) -> None:
+        decision = AnalystDecision(
+            id=1, case_id="CASE-TXN-RPT-001", txn_id="TXN-RPT-001",
+            decision="clear", analyst="jane", notes="Not fraud after review.",
+            decided_at="2026-09-03T15:00:00+00:00", is_override=True, is_false_positive=True,
+        )
+        pdf_bytes = self.generator.generate_pdf(_sample_case(), analyst_decision=decision)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    # ── Graceful degradation for a not-yet-built real-time field ────────
+
+    def test_report_renders_unchanged_without_processing_field(self) -> None:
+        # The current, real FraudCase schema — no processed_at field exists
+        # yet. This must render exactly as every other test here expects,
+        # proving the getattr-based check is a true no-op today.
+        case = _sample_case()
+        self.assertFalse(hasattr(case, "processed_at"))
+        report = self.generator.generate(case)
+        self.assertNotIn("Processed at", report.report_text)
+
+    def test_report_surfaces_processing_field_when_present(self) -> None:
+        # Simulates a future FraudCase carrying a processing timestamp
+        # (e.g. from a real-time ingestion layer) without that field
+        # actually existing in the schema yet — object.__setattr__ bypasses
+        # FraudCase's pydantic validation, which would otherwise reject an
+        # unknown field outright. This proves the report generator's
+        # getattr(case, "processed_at", None) check actually surfaces the
+        # value when it's there, not just that it tolerates its absence.
+        case = _sample_case()
+        object.__setattr__(case, "processed_at", "2026-09-03T14:00:02.500000+00:00")
+        report = self.generator.generate(case)
+        self.assertIn("Processed at", report.report_text)
+        self.assertIn("2026-09-03T14:00:02.500000+00:00", report.report_text)
+
+    def test_generate_pdf_works_with_processing_field_present(self) -> None:
+        case = _sample_case()
+        object.__setattr__(case, "processed_at", "2026-09-03T14:00:02.500000+00:00")
+        pdf_bytes = self.generator.generate_pdf(case)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
 
 
 if __name__ == "__main__":
