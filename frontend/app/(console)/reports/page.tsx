@@ -42,14 +42,16 @@ export default async function ReportsPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.txn_id} className="border-b" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                <tr key={r.txn_id} className="hoverable-row border-b" style={{ borderColor: "var(--border)" }}>
                   <td className="py-2.5 pr-3 font-mono text-xs" style={{ color: "var(--foreground)" }}>
                     {r.txn_id}
                   </td>
                   <td className="py-2.5 pr-3 font-mono text-xs font-semibold" style={{ color: TONE_COLOR[r.tone] }}>
                     {formatScore(r.risk_pct)}
                   </td>
-                  <td className="py-2.5 pr-3 text-xs" style={{ color: "var(--foreground)" }}>{r.status}</td>
+                  <td className="py-2.5 pr-3 text-xs capitalize" style={{ color: "var(--foreground)" }}>
+                    {r.status.toLowerCase().replace(/_/g, " ")}
+                  </td>
                   <td className="py-2.5 pr-3 text-xs" style={{ color: "var(--muted)" }}>{r.analyst}</td>
                   <td className="py-2.5 pr-3 text-xs" style={{ color: "var(--muted)" }}>{r.report_type}</td>
                   <td className="py-2.5 pr-3 text-right text-xs font-semibold">

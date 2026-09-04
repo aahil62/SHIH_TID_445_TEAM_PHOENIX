@@ -21,7 +21,7 @@ export default async function FeedPage() {
     <div className="mx-auto max-w-3xl px-6 py-6">
       <div className="mb-5 flex items-baseline justify-between">
         <h1 className="text-xl font-semibold tracking-tight" style={{ color: "var(--foreground)" }}>
-          INVESTIGATION FEED
+          Alert Feed
         </h1>
         <span className="text-xs" style={{ color: "var(--muted)" }}>
           {items.length} recent alert{items.length === 1 ? "" : "s"}, highest risk first

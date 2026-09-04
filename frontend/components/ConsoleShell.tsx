@@ -208,63 +208,112 @@ function AnalystBadge() {
   );
 }
 
+function NavContents({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  return (
+    <>
+      <Link href="/" className="mb-5 flex items-center gap-2 px-2 py-1" onClick={onNavigate}>
+        <Logo />
+        <span className="text-[15px] font-bold text-white">FraudLens</span>
+      </Link>
+
+      <div className="flex flex-1 flex-col gap-0.5">
+        {NAV_ITEMS.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onNavigate}
+              className="flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-sm font-medium transition-colors"
+              style={{
+                backgroundColor: active ? "rgba(22,163,106,0.16)" : "transparent",
+                boxShadow: active ? "inset 2px 0 0 var(--cobalt)" : undefined,
+                color: active ? "var(--foreground)" : "var(--graphite-foreground)",
+              }}
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="shrink-0"
+                style={{ color: active ? "var(--cobalt)" : "var(--muted)" }}
+              >
+                {item.icon}
+              </svg>
+              <span className="whitespace-nowrap">{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 export default function ConsoleShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Close the drawer on navigation — adjusting state during render (the
+  // documented React pattern for "reset state when a prop changes")
+  // instead of an effect, which would set state synchronously after commit.
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
+    setMobileNavOpen(false);
+  }
   const breadcrumb =
     BREADCRUMB[pathname] ?? (pathname.startsWith("/case") ? "Investigation" : "FraudLens");
 
   return (
     <div className="flex min-h-screen">
+      {/* Desktop sidebar — always visible at md+ */}
       <nav
-        className="sticky top-0 flex h-screen w-[220px] shrink-0 flex-col gap-1 border-r px-3 py-5 backdrop-blur-2xl"
+        className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col gap-1 border-r px-3 py-5 backdrop-blur-2xl md:flex"
         style={{ backgroundColor: "var(--graphite)", borderColor: "var(--border)" }}
       >
-        <Link href="/" className="mb-5 flex items-center gap-2 px-2 py-1">
-          <Logo />
-          <span className="text-[15px] font-bold text-white">FraudLens</span>
-        </Link>
+        <NavContents pathname={pathname} />
+      </nav>
 
-        <div className="flex flex-1 flex-col gap-0.5">
-          {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-sm font-medium transition-colors"
-                style={{
-                  backgroundColor: active ? "rgba(22,163,106,0.16)" : "transparent",
-                  boxShadow: active ? "inset 2px 0 0 var(--cobalt)" : undefined,
-                  color: active ? "var(--foreground)" : "var(--graphite-foreground)",
-                }}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="shrink-0"
-                  style={{ color: active ? "var(--cobalt)" : "var(--muted)" }}
-                >
-                  {item.icon}
-                </svg>
-                <span className="whitespace-nowrap">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
+      {/* Mobile drawer — off-canvas, toggled by the header's menu button */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 md:hidden"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <nav
+        className="fixed inset-y-0 left-0 z-50 flex h-screen w-[240px] shrink-0 flex-col gap-1 border-r px-3 py-5 backdrop-blur-2xl transition-transform duration-300 ease-out md:hidden"
+        style={{
+          backgroundColor: "var(--graphite)",
+          borderColor: "var(--border)",
+          transform: mobileNavOpen ? "translateX(0)" : "translateX(-100%)",
+        }}
+      >
+        <NavContents pathname={pathname} onNavigate={() => setMobileNavOpen(false)} />
       </nav>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div
-          className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-4 border-b px-6 backdrop-blur-2xl"
+          className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-4 border-b px-4 backdrop-blur-2xl sm:px-6"
           style={{ borderColor: "var(--border)", backgroundColor: "var(--graphite)" }}
         >
-          <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="hover-fill -ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-control)] md:hidden"
+            style={{ color: "var(--foreground)" }}
+            aria-label="Open navigation"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+          </button>
+          <span className="truncate text-sm font-semibold" style={{ color: "var(--foreground)" }}>
             {breadcrumb}
           </span>
           <div className="ml-auto flex items-center gap-4">

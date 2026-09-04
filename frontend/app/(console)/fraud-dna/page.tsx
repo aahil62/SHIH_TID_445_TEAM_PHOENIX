@@ -38,7 +38,7 @@ export default async function FraudDnaPage() {
         {patterns.map((p) => (
           <div
             key={p.ring_id}
-            className="rounded-[var(--radius-panel)] border px-5 py-4 backdrop-blur-xl"
+            className="hover-lift rounded-[var(--radius-panel)] border px-5 py-4 glass"
             style={{ borderColor: "var(--border)", backgroundColor: "var(--panel)", boxShadow: "var(--shadow-panel)" }}
           >
             <h4 className="mb-1.5 text-sm font-semibold" style={{ color: "var(--foreground)" }}>

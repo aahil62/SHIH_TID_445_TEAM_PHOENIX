@@ -39,8 +39,24 @@
   --radius-panel: 14px;
   --radius-control: 8px;
 
-  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 20px rgba(0, 0, 0, 0.35);
-  --shadow-panel-raised: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 28px rgba(0, 0, 0, 0.45);
+  /* Layered, directional — a real top catch-light, a faint inner floor
+     shadow for thickness, and one soft cast shadow (never a second,
+     boxy silhouette). This is what keeps the glass panels reading as
+     lit surfaces instead of a flat blur with a smear underneath. */
+  --shadow-panel:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 16px 32px -12px rgba(0, 0, 0, 0.5);
+  --shadow-panel-raised:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16),
+    0 2px 4px rgba(0, 0, 0, 0.25),
+    0 24px 48px -14px rgba(0, 0, 0, 0.6);
+
+  /* Real glass, not a flat blur: saturate what shows through so the
+     panel picks up color from what's behind it. */
+  --panel-blur: blur(22px) saturate(150%);
 }
 
 @theme inline {
@@ -65,10 +81,11 @@
   --color-risk-critical: var(--risk-critical);
   --color-risk-critical-bg: var(--risk-critical-bg);
 
-  /* Share Tech Mono, everywhere — one font token drives both, no
-     per-component font overrides. See app/layout.tsx. */
-  --font-sans: var(--font-share-tech-mono);
-  --font-mono: var(--font-share-tech-mono);
+  /* Instrument Sans for UI text, Space Mono reserved for identifiers,
+     scores, amounts and timestamps (every `font-mono` utility in the
+     components) — not Inter/JetBrains Mono; see app/layout.tsx for why. */
+  --font-sans: var(--font-instrument-sans);
+  --font-mono: var(--font-space-mono);
 }
 
 body {
@@ -77,10 +94,76 @@ body {
     radial-gradient(800px 500px at 88% 25%, rgba(216, 138, 69, 0.06), transparent 62%),
     var(--canvas);
   color: var(--foreground);
-  font-family: var(--font-sans), "Courier New", monospace;
-  /* Tabular alignment for scores/amounts across rows — the terminal-grid
-     feel a monospace-only console should lean into. */
+  font-family: var(--font-sans), -apple-system, "Segoe UI", sans-serif;
+}
+
+/* font-mono utilities keep tabular figures — the terminal-grid alignment
+   for scores/amounts stacked in a column. */
+.font-mono {
   font-variant-numeric: tabular-nums;
+}
+
+/* Real glass material — backdrop-filter blur + saturate, applied
+   consistently instead of Tailwind's flat backdrop-blur-xl (which blurs
+   but doesn't saturate, so it never picks up color from what's behind
+   it). Pair with a border/background that reference the panel's own
+   accent via color-mix(), never a flat overlay. */
+.glass {
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
+}
+
+/* Token-driven hover for plain list/table rows (no card chrome) — used
+   in place of ad-hoc hardcoded hover colors across the console. */
+.hoverable-row {
+  transition: background-color 0.15s ease;
+}
+@media (hover: hover) {
+  .hoverable-row:hover {
+    background-color: rgba(22, 163, 106, 0.07);
+  }
+}
+
+/* Subtle lift + glow on hover — cards only. A button that moves on hover
+   is a slop reflex ("the hover boop"); reserve any lift for cards, and
+   keep it tonal and grounded, never bouncy. */
+.hover-lift {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+@media (hover: hover) {
+  .hover-lift:hover {
+    transform: translateY(-3px);
+    border-color: rgba(22, 163, 106, 0.4);
+  }
+}
+
+/* Buttons never move on hover — a clean fill/brightness shift instead. */
+.hover-fill {
+  transition: filter 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+@media (hover: hover) {
+  .hover-fill:hover {
+    filter: brightness(1.12);
+  }
+}
+
+/* Live/streaming indicator dots across the app. */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+  50% { opacity: 0.55; }
+}
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot {
+    animation: none;
+  }
+  .hover-lift,
+  .hover-fill {
+    transition: none;
+  }
 }
 
 /* Explicit, guaranteed-visible keyboard focus — never rely on UA default. */
