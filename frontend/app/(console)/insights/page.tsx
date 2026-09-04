@@ -21,7 +21,7 @@ function MetricRow({
       className="border-b last:border-b-0"
       style={{
         borderColor: "var(--border)",
-        backgroundColor: highlighted ? "rgba(41, 84, 224, 0.08)" : undefined,
+        backgroundColor: highlighted ? "rgba(22, 163, 106, 0.08)" : undefined,
       }}
     >
       <td
@@ -63,7 +63,7 @@ export default async function InsightsPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-6">
       <div className="mb-4 flex items-baseline justify-between">
-        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
+        <h1 className="text-xl font-semibold tracking-tight" style={{ color: "var(--foreground)" }}>
           Model Performance
         </h1>
         <span className="text-xs" style={{ color: "var(--muted)" }}>

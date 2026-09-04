@@ -17,11 +17,10 @@ export default function CaseListItem({ item }: { item: Case }) {
   return (
     <Link
       href={`/case?txn_id=${encodeURIComponent(item.txn_id)}`}
-      className="block rounded-[var(--radius-panel)] border px-4 py-3 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+      className="glass hover-lift block rounded-[var(--radius-panel)] border px-4 py-3"
       style={{
-        borderColor: "var(--border)",
-        backgroundColor: "var(--panel)",
-        borderLeft: `3px solid ${tone.fg}`,
+        borderColor: `color-mix(in srgb, ${tone.fg} 40%, var(--border))`,
+        background: `linear-gradient(180deg, color-mix(in srgb, ${tone.fg} 9%, transparent), transparent 55%), var(--panel)`,
         boxShadow: "var(--shadow-panel)",
       }}
     >

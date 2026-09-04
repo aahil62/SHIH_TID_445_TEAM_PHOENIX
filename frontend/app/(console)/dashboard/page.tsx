@@ -96,8 +96,7 @@ export default async function DashboardPage() {
               <Link
                 key={t.txn_id}
                 href={`/case?txn_id=${encodeURIComponent(t.txn_id)}`}
-                className="flex items-center gap-3 rounded-[var(--radius-control)] px-2 py-2 transition-colors"
-                style={{ borderColor: "transparent" }}
+                className="hoverable-row flex items-center gap-3 rounded-[var(--radius-control)] px-2 py-2 transition-colors"
               >
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: tone.fg }} />
                 <span className="w-40 shrink-0 truncate font-mono text-xs" style={{ color: "var(--muted)" }}>

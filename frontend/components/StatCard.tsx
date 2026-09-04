@@ -10,8 +10,14 @@ export default function StatCard({
 }) {
   return (
     <div
-      className="rounded-[var(--radius-panel)] border px-5 py-4 backdrop-blur-xl"
-      style={{ borderColor: "var(--border)", backgroundColor: "var(--panel)", boxShadow: "var(--shadow-panel)" }}
+      className="glass hover-lift rounded-[var(--radius-panel)] border px-5 py-4"
+      style={{
+        borderColor: color ? `color-mix(in srgb, ${color} 30%, var(--border))` : "var(--border)",
+        background: color
+          ? `linear-gradient(180deg, color-mix(in srgb, ${color} 7%, transparent), transparent 60%), var(--panel)`
+          : "var(--panel)",
+        boxShadow: "var(--shadow-panel)",
+      }}
     >
       <div
         className="mb-2 text-[11px] font-semibold uppercase tracking-wider"

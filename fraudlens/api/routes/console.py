@@ -11,46 +11,17 @@ so these aggregates don't depend on request order.
 
 from __future__ import annotations
 
-import threading
 from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter
 
+from fraudlens.api.case_cache import all_cases as _all_cases
 from fraudlens.api.state import state
 from fraudlens.models.schemas import AuditEvent, Decision, FraudCase
 from fraudlens.runtime import FraudLensRuntime
 
 router = APIRouter(tags=["console"])
-
-_cache_lock = threading.Lock()
-_cache_runtime_id: int | None = None
-_all_cases_cache: list[FraudCase] | None = None
-
-
-def _all_cases(runtime: FraudLensRuntime) -> list[FraudCase]:
-    """Every transaction in the fixed dataset, analyzed once. Cached at
-    module level since the dataset and models are deterministic for the
-    life of a given runtime — recomputing on every dashboard/reports/audit
-    request would mean re-running all six agents over ~1,000 transactions
-    per page load. Keyed on the runtime's identity (not just "is it None")
-    so a fresh runtime — e.g. a new test class's own TestClient rebuilding
-    the app's lifespan — invalidates the cache instead of silently reusing
-    another runtime's cases.
-
-    Lock-guarded: FastAPI runs sync routes in a thread pool, and the
-    frontend's console pages fire dashboard/network/reports/audit requests
-    in parallel — without this lock, two threads could both see a stale
-    cache and call runtime.analyze() concurrently, mutating CaseEngine's
-    internal cases dict from two threads at once ("dictionary changed size
-    during iteration", a real crash hit and reproduced during live
-    testing, not a hypothetical)."""
-    global _cache_runtime_id, _all_cases_cache
-    with _cache_lock:
-        if _cache_runtime_id != id(runtime):
-            _all_cases_cache = [runtime.analyze(t.txn_id) for t in runtime.transactions]
-            _cache_runtime_id = id(runtime)
-        return _all_cases_cache
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────

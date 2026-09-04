@@ -75,7 +75,7 @@ export default async function CasePage({
       </div>
 
       <h1 className="mb-4 text-xl font-semibold tracking-tight" style={{ color: "var(--foreground)" }}>
-        CASE INVESTIGATION
+        Case Investigation
       </h1>
 
       <div className="flex flex-col gap-4">
