@@ -1,9 +1,18 @@
+import Link from "next/link";
 import { getDnaPatterns } from "@/lib/api";
 import Panel from "@/components/Panel";
 import StatCard from "@/components/StatCard";
 import { formatScore } from "@/lib/risk";
 
-export default async function FraudDnaPage() {
+export default async function FraudDnaPage({
+  searchParams,
+}: PageProps<"/fraud-dna">) {
+  const params = await searchParams;
+  const ringParam = typeof params.ring === "string" ? params.ring : undefined;
+  const fraudTypeParam = typeof params.fraud_type === "string" ? params.fraud_type : undefined;
+  const isHighlighted = (p: { ring_id: string; fraud_type: string }) =>
+    (ringParam && p.ring_id === ringParam) || (fraudTypeParam && p.fraud_type === fraudTypeParam);
+
   const { patterns } = await getDnaPatterns();
   const totalMatches = patterns.reduce((sum, p) => sum + p.matches, 0);
   const topConfidence = Math.max(0, ...patterns.map((p) => p.avg_confidence ?? 0));
@@ -35,35 +44,53 @@ export default async function FraudDnaPage() {
         Pattern Library
       </div>
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {patterns.map((p) => (
-          <div
-            key={p.ring_id}
-            className="rounded-[var(--radius-panel)] border px-5 py-4 backdrop-blur-xl"
-            style={{ borderColor: "var(--border)", backgroundColor: "var(--panel)", boxShadow: "var(--shadow-panel)" }}
-          >
-            <h4 className="mb-1.5 text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-              {p.name}
-            </h4>
-            <p className="mb-3 text-xs leading-relaxed" style={{ color: "var(--muted)" }}>
-              {p.description}
-            </p>
-            <div className="flex items-center justify-between font-mono text-[11px]">
-              <span style={{ color: "var(--muted)" }}>{p.matches} matches</span>
-              <span style={{ color: "var(--amber)" }} className="font-semibold">
-                {p.avg_confidence !== null ? `${formatScore(p.avg_confidence)} conf.` : "no matches yet"}
-              </span>
+        {patterns.map((p) => {
+          const highlighted = Boolean(isHighlighted(p));
+          return (
+            <div
+              key={p.ring_id}
+              id={`pattern-${p.ring_id}`}
+              className="panel-fade-in scroll-mt-6 rounded-[var(--radius-panel)] border px-5 py-4 backdrop-blur-xl transition-[box-shadow,border-color]"
+              style={{
+                borderColor: highlighted ? "var(--amber)" : "var(--border)",
+                backgroundColor: "var(--panel)",
+                boxShadow: highlighted ? "0 0 0 1px var(--amber), var(--shadow-panel)" : "var(--shadow-panel)",
+              }}
+            >
+              <h4 className="mb-1.5 text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+                {p.name}
+              </h4>
+              <p className="mb-3 text-xs leading-relaxed" style={{ color: "var(--muted)" }}>
+                {p.description}
+              </p>
+              <div className="flex items-center justify-between font-mono text-[11px]">
+                <span style={{ color: "var(--muted)" }}>{p.matches} matches</span>
+                <span style={{ color: "var(--amber)" }} className="font-semibold">
+                  {p.avg_confidence !== null ? `${formatScore(p.avg_confidence)} conf.` : "no matches yet"}
+                </span>
+              </div>
+              {p.matches > 0 && (
+                <Link
+                  href={`/network?fraud_type=${encodeURIComponent(p.fraud_type)}`}
+                  className="mt-3 block text-[11px] font-medium underline-offset-2 hover:underline"
+                  style={{ color: "var(--amber)" }}
+                >
+                  View matched ring on Fraud Network →
+                </Link>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <Panel title="Recent Matches">
         {matchedRings.length > 0 ? (
           <div className="flex flex-col divide-y" style={{ borderColor: "var(--border)" }}>
             {matchedRings.map((p) => (
-              <div
+              <Link
                 key={p.ring_id}
-                className="flex items-center gap-4 py-2.5 text-sm"
+                href={`#pattern-${p.ring_id}`}
+                className="hoverable-row flex items-center gap-4 py-2.5 text-sm transition-colors"
                 style={{ borderColor: "var(--border)" }}
               >
                 <span className="w-40 shrink-0 font-mono text-xs" style={{ color: "var(--muted)" }}>
@@ -73,7 +100,7 @@ export default async function FraudDnaPage() {
                 <span className="font-semibold" style={{ color: "var(--amber)" }}>
                   {p.avg_confidence !== null ? formatScore(p.avg_confidence) : "—"}
                 </span>
-              </div>
+              </Link>
             ))}
           </div>
         ) : (

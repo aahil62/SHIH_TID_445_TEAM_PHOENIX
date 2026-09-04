@@ -234,6 +234,22 @@ export default async function CasePage({
               <p className="mt-2 text-xs font-medium" style={{ color: "var(--risk-high)" }}>
                 {fraud_dna_match.recommendation}
               </p>
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-medium">
+                <Link
+                  href={`/fraud-dna?ring=${encodeURIComponent(fraud_dna_match.matched_ring_id)}#pattern-${encodeURIComponent(fraud_dna_match.matched_ring_id)}`}
+                  className="underline-offset-2 hover:underline"
+                  style={{ color: "var(--amber)" }}
+                >
+                  View pattern in library →
+                </Link>
+                <Link
+                  href={`/network?fraud_type=${encodeURIComponent(fraud_dna_match.fraud_type)}`}
+                  className="underline-offset-2 hover:underline"
+                  style={{ color: "var(--amber)" }}
+                >
+                  View on Fraud Network →
+                </Link>
+              </div>
             </div>
           ) : (
             <p className="text-sm" style={{ color: "var(--muted)" }}>
@@ -247,11 +263,6 @@ export default async function CasePage({
             the question itself. */}
         <Panel title="Ask Copilot">
           <CopilotChat txnId={caseDetail.txn_id} />
-        </Panel>
-
-        {/* 7. DECISION */}
-        <Panel title="Decision">
-          <DecisionForm txnId={caseDetail.txn_id} currentDecision={caseDetail.decision} />
         </Panel>
       </div>
     </div>

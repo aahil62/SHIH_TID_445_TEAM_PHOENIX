@@ -6,14 +6,27 @@ import StatCard from "@/components/StatCard";
 import { formatScore } from "@/lib/risk";
 import type { CaseGraph } from "@/lib/types";
 
-export default async function NetworkPage() {
+export default async function NetworkPage({
+  searchParams,
+}: PageProps<"/network">) {
+  const params = await searchParams;
+  const ringParam = typeof params.ring === "string" ? params.ring : undefined;
+  const fraudTypeParam = typeof params.fraud_type === "string" ? params.fraud_type : undefined;
+
   const summary = await getNetworkSummary();
-  const topRing = summary.rings[0];
+  // Arriving from /fraud-dna or /case with a specific ring/fraud_type in
+  // the URL puts that ring in the main graph panel instead of always
+  // defaulting to the largest one — this is what makes the cross-link
+  // actually land somewhere relevant instead of just landing on /network.
+  const selectedRing =
+    (ringParam && summary.rings.find((r) => r.ring_id === ringParam)) ||
+    (fraudTypeParam && summary.rings.find((r) => r.fraud_type === fraudTypeParam)) ||
+    summary.rings[0];
 
   let graph: CaseGraph | null = null;
-  if (topRing) {
+  if (selectedRing) {
     try {
-      graph = (await getCaseGraph(topRing.txn_id)).graph;
+      graph = (await getCaseGraph(selectedRing.txn_id)).graph;
     } catch {
       graph = null;
     }
@@ -38,13 +51,28 @@ export default async function NetworkPage() {
           label="Top Fraud DNA match"
           value={summary.top_dna_match_pct ? formatScore(summary.top_dna_match_pct) : "—"}
           color="var(--amber)"
+          href="/fraud-dna"
         />
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <Panel title={topRing ? `Ring ${topRing.ring_id}` : "No ring in view"}>
-          {topRing ? (
-            <FraudRingGraph graph={graph} />
+        <Panel title={selectedRing ? `Ring ${selectedRing.ring_id}` : "No ring in view"}>
+          {selectedRing ? (
+            <>
+              <FraudRingGraph graph={graph} />
+              {selectedRing.fraud_type && (
+                <p className="mt-3 text-xs" style={{ color: "var(--muted)" }}>
+                  Matched Fraud DNA pattern:{" "}
+                  <Link
+                    href={`/fraud-dna?fraud_type=${encodeURIComponent(selectedRing.fraud_type)}`}
+                    className="font-semibold underline-offset-2 hover:underline"
+                    style={{ color: "var(--amber)" }}
+                  >
+                    {selectedRing.fraud_type.replace(/_/g, " ")} →
+                  </Link>
+                </p>
+              )}
+            </>
           ) : (
             <p className="text-sm" style={{ color: "var(--muted)" }}>
               No fraud rings detected in the current dataset.
@@ -54,20 +82,40 @@ export default async function NetworkPage() {
 
         <Panel title="All detected rings">
           <div className="flex flex-col gap-2">
-            {summary.rings.map((r) => (
-              <Link
-                key={r.ring_id}
-                href={`/case?txn_id=${encodeURIComponent(r.txn_id)}`}
-                className="flex items-center justify-between rounded-[var(--radius-control)] border px-3 py-2 text-xs transition-colors"
-                style={{ borderColor: "var(--border)" }}
-              >
-                <span className="font-mono" style={{ color: "var(--foreground)" }}>{r.ring_id}</span>
-                <span style={{ color: "var(--muted)" }}>{r.ring_size} accounts</span>
-                <span style={{ color: "var(--amber)" }}>
-                  {r.fraud_type ? r.fraud_type.replace(/_/g, " ") : "unmatched"}
-                </span>
-              </Link>
-            ))}
+            {summary.rings.map((r) => {
+              const isSelected = selectedRing?.ring_id === r.ring_id;
+              return (
+                <div
+                  key={r.ring_id}
+                  id={`ring-${r.ring_id}`}
+                  className="hoverable-panel flex scroll-mt-6 items-center justify-between rounded-[var(--radius-control)] border px-3 py-2 text-xs transition-colors"
+                  style={{
+                    borderColor: isSelected ? "var(--amber)" : "var(--border)",
+                    boxShadow: isSelected ? "0 0 0 1px var(--amber)" : undefined,
+                  }}
+                >
+                  <Link
+                    href={`/case?txn_id=${encodeURIComponent(r.txn_id)}`}
+                    className="font-mono hover:underline"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    {r.ring_id}
+                  </Link>
+                  <span style={{ color: "var(--muted)" }}>{r.ring_size} accounts</span>
+                  {r.fraud_type ? (
+                    <Link
+                      href={`/fraud-dna?fraud_type=${encodeURIComponent(r.fraud_type)}`}
+                      className="font-medium underline-offset-2 hover:underline"
+                      style={{ color: "var(--amber)" }}
+                    >
+                      {r.fraud_type.replace(/_/g, " ")}
+                    </Link>
+                  ) : (
+                    <span style={{ color: "var(--muted)" }}>unmatched</span>
+                  )}
+                </div>
+              );
+            })}
             {summary.rings.length === 0 && (
               <p className="text-sm" style={{ color: "var(--muted)" }}>No rings to show.</p>
             )}
