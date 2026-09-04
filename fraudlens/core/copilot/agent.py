@@ -225,7 +225,14 @@ class LLMClient(Protocol):
 
 
 _GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
-_DEFAULT_MODEL = "llama-3.3-70b-versatile"
+# llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16 (free/
+# developer tier) — this was the actual cause of live /copilot/chat calls
+# failing with a 502 "Copilot's LLM call failed" error, not a bad key.
+# openai/gpt-oss-120b is Groq's own recommended replacement and, like the
+# model it replaces, supports native tool/function calling — confirmed
+# against Groq's own docs before swapping, not assumed. See
+# https://console.groq.com/docs/deprecations.
+_DEFAULT_MODEL = "openai/gpt-oss-120b"
 
 _TOOL_ROUTER_SYSTEM_PROMPT = (
     "You are the tool router for FraudLens Copilot, a fraud-investigation "
