@@ -145,6 +145,14 @@ class FraudCase(BaseModel):
     fraud_dna_match: Optional[FraudDNAMatch] = None
     recommended_action: str = ""
     created_at: str = Field(default_factory=_now_iso)
+    # Bounded autonomous action (see fraudlens/core/cases/autonomous_action.py).
+    # "auto_held" when the case cleared every corroborating-signal threshold
+    # at once; never a claim that a real payment was stopped. Always
+    # overridable — set back to None, with system_action_overridden_at
+    # stamped, the moment an analyst records any decision on the case via
+    # DecisionWorkflow.submit_decision().
+    system_action: Optional[str] = None
+    system_action_overridden_at: Optional[str] = None
 
 
 # ── Analyst workflow (populated by feature/graph-behavioral in Stage B) ─────
@@ -170,6 +178,21 @@ class AuditEvent(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+# ── Regulatory context (populated by main in Stage C) ────────────────────
+#
+# Reference-only mapping to real Indian regulatory frameworks (RBI, PMLA,
+# CERT-In) — see fraudlens/core/compliance/regulatory_matrix.py. Never a
+# record of an actual filing: FraudLens does not submit anything to RBI,
+# FIU-IND, or CERT-In. `hedge` always carries the "typically reportable
+# under..." framing so a report can't be misread as a compliance action log.
+
+class RegulatoryReference(BaseModel):
+    framework: str
+    citation: str
+    relevance: str
+    hedge: str
+
+
 # ── Report (populated by main in Stage B) ────────────────────────────────
 
 class FraudReport(BaseModel):
@@ -188,6 +211,8 @@ class FraudReport(BaseModel):
     graph_evidence: Optional[GraphEvidence] = None
     fraud_dna_match: Optional[FraudDNAMatch] = None
     recommended_action: str
+    system_action: Optional[str] = None
+    regulatory_context: list[RegulatoryReference] = Field(default_factory=list)
     report_status: str = "draft"
     generated_at: str = Field(default_factory=_now_iso)
     report_text: str = ""

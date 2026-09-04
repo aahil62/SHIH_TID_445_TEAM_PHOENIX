@@ -13,7 +13,7 @@ def get_report(txn_id: str) -> dict:
     case = runtime.engine.get_case_by_txn(txn_id)
     if case is None:
         try:
-            case = runtime.engine.analyze(txn_id)
+            case = runtime.analyze(txn_id)
         except ValueError:
             raise HTTPException(status_code=404, detail=f"Transaction {txn_id} not found")
 

@@ -24,7 +24,7 @@ def submit_decision(payload: DecisionRequest) -> dict:
     case = runtime.engine.get_case_by_txn(payload.txn_id)
     if case is None:
         try:
-            case = runtime.engine.analyze(payload.txn_id)
+            case = runtime.analyze(payload.txn_id)
         except ValueError:
             raise HTTPException(status_code=404, detail=f"Transaction {payload.txn_id} not found")
 
