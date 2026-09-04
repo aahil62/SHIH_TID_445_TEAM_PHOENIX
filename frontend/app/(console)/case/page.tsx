@@ -85,6 +85,15 @@ export default async function CasePage({
             <span className="text-sm font-bold tracking-wide" style={{ color: tone.fg }}>
               {RISK_TIER_LABEL[caseDetail.decision]}
             </span>
+            {caseDetail.system_action === "auto_held" && (
+              <span
+                className="rounded-[var(--radius-control)] px-2 py-0.5 text-[11px] font-bold tracking-wide"
+                style={{ backgroundColor: "var(--risk-medium-bg)", color: "var(--risk-medium)" }}
+                title="Held automatically pending review — no real transaction was stopped. Clears the instant an analyst records a decision."
+              >
+                AUTO-HELD
+              </span>
+            )}
             <span className="font-mono text-sm font-semibold">
               {formatAmount(transaction.amount)} transaction
             </span>

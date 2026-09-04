@@ -7,14 +7,16 @@ Team Phoenix · SHIH-TID-445 · Problem SH-FIN-01 · Smart Horizon 2026 Grand Fi
 Built for the Smart Horizon 2026 Grand Finale (03–05 Sep 2026, NHCE Bengaluru), evolving Team
 Phoenix's Level 0 and Level 1 concept — the same jury already reviewed that prototype and asked
 for more recent AI research and advanced modeling. This build answers that directly with a trained,
-benchmarked ML model sitting alongside four independent detection signals.
+benchmarked ML model, five other independent detection signals, a bounded autonomous-action layer,
+and Indian regulatory reference context — none of it a mockup.
 
 FraudLens doesn't just answer "is this transaction risky?" It answers: what pattern does this
-belong to, have we seen it before, and what should the analyst do next?
+belong to, have we seen it before, who — or what — should act on it, and under what regulatory
+framework does that action fall?
 
 ## What it does
 
-A transaction enters the system and is independently evaluated by **five scoring agents**, each
+A transaction enters the system and is independently evaluated by **six scoring agents**, each
 looking at a different angle of risk:
 
 | Agent | What it catches |
@@ -22,23 +24,54 @@ looking at a different angle of risk:
 | **Rule agent** | High amounts, risky merchant categories, odd hours, structuring patterns |
 | **Velocity agent** | Transaction bursts — too many, too fast, on one account |
 | **Behavioral agent** | Deviation from *this account's own* historical pattern |
-| **Graph agent** | Shared devices/IPs across accounts — the signal that catches coordinated rings, not just lone transactions |
+| **Graph agent** | Shared devices/IPs across accounts, ring membership found via Louvain community detection — the signal that catches coordinated rings, not just lone transactions |
 | **ML agent** | A trained gradient-boosted classifier learning nonlinear patterns no hand-written rule captures |
+| **Fraud DNA agent** | Matches a detected ring's fingerprint against a growing library of confirmed fraud typologies |
 
-A sixth signal, **fraud_dna_agent**, joins the same ensemble vote — not as an afterthought that
-only decorates a decision already made, but as a real vote in it. When the graph agent detects a
-ring, the cluster is fingerprinted and checked against a **Fraud DNA** library of known fraud
-typologies; a strong match measurably raises the score, and abstains cleanly (no false "clear"
-vote) on the majority of transactions with no detected ring. Confirmed fraud from an analyst adds
-its profile to the library, so the *next* similar ring — under different accounts — gets caught
-too. All amounts are in ₹ (INR), matching this problem statement's Indian regulatory context.
+Fraud DNA is a real vote in the same ensemble, not an afterthought decorating a decision already
+made: when the graph agent detects a ring (Louvain community detection, not BFS), the cluster is
+fingerprinted and checked against the **Fraud DNA** library; a strong match measurably raises the
+score, and it abstains cleanly (no false "clear" vote) on the majority of transactions with no
+detected ring. Confirmed fraud from an analyst adds its profile to the library, so the *next*
+similar ring — under different accounts — gets caught too. All amounts are in ₹ (INR), matching
+this problem statement's Indian regulatory context.
 
 Their outputs are combined by a weighted **ensemble scorer** into one decision: clear, review,
 block, or block-and-report.
 
-Every analyst decision — confirm, override, escalate — is logged to an **audit trail**, with
-ring-linked overrides flagged distinctly from ordinary ones. A **report generator** turns any case
-into a structured, masked investigation report ready for compliance review.
+## Beyond detection: action, oversight, and compliance
+
+Detection alone isn't the product — what happens next is:
+
+- **Bounded autonomous action.** The overwhelming majority of cases go to a human, always. A
+  narrow exception: when `final_score ≥ 0.90` **and** `confidence ≥ 0.85` **and** (if Fraud DNA has
+  an opinion) `similarity ≥ 0.85` all clear *together* — a conjunction, never a single threshold —
+  the case is marked `auto_held`. Never `auto_blocked`: there's no real payment gateway behind this
+  system, so the only honest framing is "held pending review." The action is logged as its own
+  distinct, fully-explainable audit event (`event_type=autonomous_action`, `actor=system`,
+  carrying the exact triggering scores), and any analyst decision reverses it immediately and
+  permanently — a case is never final without a human able to override it. See
+  `fraudlens/core/cases/autonomous_action.py`.
+- **Regulatory reference context.** A dedicated module maps each case's severity (and, for
+  cyber-enabled patterns like account takeover or device-farm fraud, its typology) to three real
+  Indian frameworks: the **RBI Master Directions on Fraud Risk Management**, **PMLA 2002 §12**
+  (Suspicious Transaction Reports to FIU-IND), and **CERT-In's 2022 cyber incident reporting
+  directions**. Every reference is hedged explicitly — *"typically reportable under..., not a
+  record of any actual filing"* — reference context for the analyst's own judgment, never a claim
+  that FraudLens filed anything. See `fraudlens/core/compliance/regulatory_matrix.py`.
+- **Audit trail + decisions.** Every analyst decision — confirm, override, escalate — and every
+  system action is logged immutably, with ring-linked overrides flagged distinctly from ordinary
+  ones. Both a per-case view and a global, cross-case audit log are available.
+- **Reports.** Any case becomes a structured, masked investigation report — as JSON, rendered
+  markdown, or a real generated **PDF** (`fpdf2`, laid out from the case directly, not a markdown
+  screenshot).
+- **Copilot.** A tool-calling chat assistant grounded entirely in real case data — the LLM only
+  ever picks from a whitelisted tool name; the tool's real `CaseEngine` output is the only source
+  of fact; a second call just paraphrases that JSON, so it's structurally resistant to
+  hallucinating evidence that doesn't exist. Ships fully built and tested (`fraudlens/core/copilot/`,
+  the "Ask Copilot" panel on every case) — **currently blocked** on the team's Groq account
+  rejecting every model with `model_not_found`; the route itself returns a clean, real error
+  (502/503) rather than a fake answer when that happens.
 
 ## Results
 
@@ -58,7 +91,7 @@ The ensemble beats every individual signal — the trained model is the stronges
 and combining it with graph, behavioral, velocity, rule, and Fraud DNA signals still improves on
 it further. The `ml_agent` ensemble weight itself was set empirically: swept against this same
 benchmark rather than guessed, then capped deliberately below its single-split optimum to keep the
-ensemble genuinely multi-signal rather than over-concentrated on one model.
+ensemble genuinely multi-signal rather than over-concentrated on one model. Live at `/insights`.
 
 ### External validation — a real, published fraud dataset, not just our own
 
@@ -95,47 +128,72 @@ flowchart LR
     E --> C[Case Engine]
     D -.analyst confirms.-> LIB[(Fraud DNA<br/>library)]
     LIB -.matches next ring.-> D
+    C --> AA[Autonomous Action<br/>bounded, reversible]
+    C --> RM[Regulatory Matrix<br/>RBI / PMLA / CERT-In]
     C --> W[Decision Workflow<br/>+ audit trail]
-    C --> RPT[Report Generator]
+    C --> RPT[Report Generator<br/>markdown + PDF]
+    C --> CP[Copilot<br/>tool-grounded chat]
     C --> API[FastAPI]
-    API --> FE[Next.js Analyst Console<br/>Alert Feed → Investigation]
+    API --> FE[Next.js Analyst Console]
 ```
 
 ## Product
 
-A working analyst console, not a mockup:
+A working analyst console, not a mockup — nine real pages, every one wired to a live API call:
 
-- **Alert Feed** (`/feed`) — recent transactions sorted by risk, with the top reason in plain
-  language before any technical detail.
-- **Investigation view** (`/case`) — leads with the recommendation and confidence, then agent
-  evidence, then graph/ring evidence and Fraud DNA match when present, then a decision form that
-  writes back through the real API and shows up in the real audit trail.
+- **Landing** (`/`) — the product's front door; even its "live" preview numbers (critical alert
+  count, agent averages) are pulled from the real API at render time, not hardcoded.
+- **Dashboard** (`/dashboard`) — aggregate risk counts, a per-day risk trend, agent performance,
+  recent alerts.
+- **Alert Feed** (`/feed`) — recent transactions sorted by risk, plain-language reason first.
+- **Investigation** (`/case`) — leads with the recommendation and confidence (and an **AUTO-HELD**
+  badge when the autonomous-action layer fired), then agent evidence, graph/ring evidence and
+  Fraud DNA match, an Ask Copilot panel, and a decision form that writes back through the real API.
+- **Investigations** (`/cases`) — every analyzed case, richer per-signal detail than the feed.
+- **Fraud Network** (`/network`) — cross-case ring summary plus the real, masked graph for the
+  top ring.
+- **Fraud DNA** (`/fraud-dna`) — the real 5-pattern seed library with honest per-pattern match
+  counts derived from analyzed cases (a pattern with zero real matches shows "0 matches," never a
+  fabricated number).
+- **Reports** (`/reports`) — every case sorted by risk, real decision status, PDF export.
+- **Audit Trail** (`/audit`) — a global, cross-case log with plain-language event text.
+- **Performance** (`/insights`) — the benchmark and ULB external-validation numbers, live.
 
-Design system: cool near-white canvas, graphite navigation rail, cobalt for primary actions, red/
-amber/green reserved strictly for risk states, plain language before evidence.
+Design system: dark "forensic terminal" theme — near-black canvas, translucent glass panels,
+emerald for primary actions and the accent identity, amber reserved for Fraud DNA/network content,
+red/amber/green reserved strictly for risk states, plain language before evidence.
 
 ## Engineering quality
 
-- **137 backend tests, all green** (138 with the optional ULB validation downloaded) — schemas,
+- **247 backend tests, all green** (248 with the optional ULB validation downloaded) — schemas,
   all six scoring signals, ensemble math (including the abstain-vs-vote distinction that keeps
   Fraud DNA from wrongly dragging down non-ring transactions), case orchestration, graph/ring
-  detection, Fraud DNA matching and library growth, decision workflow, report generation, and full
-  API integration tests hitting a live server, not just in-process mocks.
-- **Five pull requests, five clean merges, zero conflicts** — four people building in parallel on
-  isolated branches (core engine, rules/ML, graph/Fraud DNA, frontend) against a shared contract
-  defined once on `main`, never touching each other's files.
-- **Frontend**: TypeScript, `npm run build` and lint both clean.
-- Every ensemble/report/schema decision along the way was verified against real run output before
-  being committed — including catching and fixing gaps found only by exercising the system live
-  (a schema field two branches actually needed, a demo script silently hiding a real result, a
-  frontend panel rendering raw arrays instead of counts, a currency rescale that had to move the
-  Fraud DNA library's amounts and similarity math together or silently break matching).
+  detection, Fraud DNA matching and library growth, the autonomous-action conjunction (each signal
+  individually insufficient, all three together sufficient, reversal survives re-analysis),
+  regulatory-context hedging, PDF generation (including a real font-encoding regression for ₹
+  symbols in agent reason strings), decision workflow, report generation, the four new system-wide
+  console endpoints, and full API integration tests hitting a live server, not just in-process
+  mocks.
+- **Test isolation**: the suite writes every persisted file (cases, decisions, audit log, Fraud DNA
+  library) to a throwaway temp directory instead of the same files the live demo server reads —
+  running tests can no longer leak test-analyst names into a running demo's audit trail.
+- **Eleven pull requests, eleven clean merges** across parallel branches (core engine, rules/ML,
+  graph/Fraud DNA, frontend, Copilot + PDF export, autonomy + compliance) against a shared contract
+  defined once on `main` — main-only merges, always independently re-verified (fresh checkout,
+  full diff review, full test rerun) before merging, never trusting a branch's own report.
+- **Frontend**: TypeScript, 5/5 Vitest tests, `npm run build` and lint both clean.
+- Every decision along the way was verified against real run output before being committed —
+  including catching and fixing gaps found only by exercising the system live (a schema field two
+  branches actually needed, a demo script silently hiding a real result, a frontend panel rendering
+  raw arrays instead of counts, a currency rescale that had to move the Fraud DNA library's amounts
+  and similarity math together or silently break matching, a masked-bullet and a literal-₹
+  font-encoding bug in the PDF export, and the test-data-pollution issue above).
 
 ## Tech stack
 
-**Backend:** Python, FastAPI, Pydantic, scikit-learn, NetworkX
+**Backend:** Python, FastAPI, Pydantic, scikit-learn, NetworkX, fpdf2
 **Frontend:** Next.js (App Router), TypeScript, Tailwind CSS
-**Testing:** `unittest` (backend), TypeScript + ESLint (frontend)
+**Testing:** `unittest` (backend), Vitest + React Testing Library (frontend)
 
 ## Running it
 
@@ -143,14 +201,17 @@ amber/green reserved strictly for risk states, plain language before evidence.
 # Backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python -m unittest discover -s tests        # 137 tests
+python -m unittest discover -s tests        # 247 tests, isolated temp data files
 python scripts/run_demo.py                  # a real transaction through every agent
 uvicorn fraudlens.api.main:app --reload --port 8001
+
+# Optional: Copilot needs a Groq key (not required for anything else)
+export GROQ_API_KEY="gsk_..."               # /copilot/chat returns a clean 503 without it
 
 # Frontend (separate terminal)
 cd frontend
 npm install
-npm run dev                                 # http://localhost:3000/feed
+npm run dev                                 # http://localhost:3000
 
 # Optional: external validation on real data (see fraudlens/evaluation/validate_ulb.py)
 curl -o fraudlens/data/external/creditcard_ulb.csv \
@@ -162,7 +223,7 @@ python -m fraudlens.evaluation.validate_ulb
 
 | Area | Contributor |
 |---|---|
-| Architecture, core engine, integration | Aahil (Team Lead) |
+| Architecture, core engine, integration, autonomy + compliance, console/product design | Aahil (Team Lead) |
 | Rule/velocity agents, ML model, benchmark suite | Mehul |
 | Graph/ring detection, Fraud DNA, decision workflow | Aditya |
-| Analyst console (Next.js) | Unnati |
+| Copilot, PDF report export, frontend | Unnati |

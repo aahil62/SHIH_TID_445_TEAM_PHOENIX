@@ -66,6 +66,10 @@ export interface Case {
   graph_evidence: GraphEvidence | null;
   fraud_dna_match: FraudDnaMatch | null;
   recommended_action: string;
+  /** "auto_held" when the bounded autonomous-action layer held this case
+   * pending review — never a claim that a real transaction was stopped.
+   * Cleared the instant an analyst records any decision. */
+  system_action: string | null;
   created_at: string;
 }
 

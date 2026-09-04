@@ -8,6 +8,7 @@ place that knows how the pieces fit together.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 
 from fraudlens.core.cases.case_engine import CaseEngine
@@ -25,11 +26,29 @@ from fraudlens.models.schemas import FraudCase, Transaction
 
 @dataclass(frozen=True)
 class RuntimeConfig:
+    """Env-overridable so the test suite can point every persisted file at
+    a throwaway temp directory (see tests/__init__.py) instead of writing
+    real analyst decisions/audit events into the same files the live demo
+    server reads from. Production/demo runs are unaffected — the env vars
+    are unset outside the test suite, so these defaults are unchanged."""
+
     seed: int | None = 42
-    cases_path: str = "fraudlens/data/cases.json"
-    dna_store_path: str = "fraudlens/data/fraud_dna_library.json"
-    decisions_path: str = "fraudlens/data/analyst_decisions.json"
-    audit_path: str = "fraudlens/data/audit_log.json"
+    cases_path: str = field(
+        default_factory=lambda: os.environ.get("FRAUDLENS_CASES_PATH", "fraudlens/data/cases.json")
+    )
+    dna_store_path: str = field(
+        default_factory=lambda: os.environ.get(
+            "FRAUDLENS_DNA_STORE_PATH", "fraudlens/data/fraud_dna_library.json"
+        )
+    )
+    decisions_path: str = field(
+        default_factory=lambda: os.environ.get(
+            "FRAUDLENS_DECISIONS_PATH", "fraudlens/data/analyst_decisions.json"
+        )
+    )
+    audit_path: str = field(
+        default_factory=lambda: os.environ.get("FRAUDLENS_AUDIT_PATH", "fraudlens/data/audit_log.json")
+    )
 
 
 @dataclass
