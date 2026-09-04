@@ -15,7 +15,7 @@ export default function Panel({
 }) {
   return (
     <section
-      className="rounded-[var(--radius-panel)] border px-5 py-4"
+      className="rounded-[var(--radius-panel)] border px-5 py-4 backdrop-blur-xl"
       style={{
         borderColor: "var(--border)",
         backgroundColor: "var(--panel)",

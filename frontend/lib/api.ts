@@ -1,12 +1,17 @@
 import type {
+  AuditLogEvent,
   Case,
   CaseGraphResponse,
   CopilotChatRequest,
   CopilotChatResponse,
+  DashboardStats,
   DecisionSubmission,
+  DnaPattern,
   HealthResponse,
+  NetworkSummary,
   PerformanceStats,
   RecentTransaction,
+  ReportRow,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8001";
@@ -62,6 +67,26 @@ export function getHealth() {
 
 export function getPerformanceStats() {
   return apiFetch<PerformanceStats>(`/stats/performance`);
+}
+
+export function getDashboardStats() {
+  return apiFetch<DashboardStats>(`/stats/dashboard`);
+}
+
+export function getDnaPatterns() {
+  return apiFetch<{ patterns: DnaPattern[] }>(`/dna/patterns`);
+}
+
+export function getGlobalAudit(limit = 100) {
+  return apiFetch<{ events: AuditLogEvent[] }>(`/audit?limit=${limit}`);
+}
+
+export function getReports(limit = 50) {
+  return apiFetch<{ rows: ReportRow[] }>(`/reports?limit=${limit}`);
+}
+
+export function getNetworkSummary() {
+  return apiFetch<NetworkSummary>(`/network/summary`);
 }
 
 /** Carries the real HTTP status and the backend's own `detail` message —

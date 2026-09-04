@@ -163,6 +163,10 @@ class DecisionWorkflow:
     def get_audit_trail(self, case_id: str) -> list[AuditEvent]:
         return [e for e in self._audit_events if e.case_id == case_id]
 
+    def get_all_events(self) -> list[AuditEvent]:
+        """Every audit event across every case — the global audit log."""
+        return list(self._audit_events)
+
     def is_high_risk_override(self, case: FraudCase, decision: str) -> bool:
         """True when `decision` downgrades a case whose graph evidence shows
         a detected ring — an analyst reversing a ring-linked block."""

@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from fraudlens.api.routes.cases import router as cases_router
+from fraudlens.api.routes.console import router as console_router
 from fraudlens.api.routes.copilot import router as copilot_router
 from fraudlens.api.routes.decisions import router as decisions_router
 from fraudlens.api.routes.health import router as health_router
@@ -57,3 +58,4 @@ app.include_router(reports_router)
 app.include_router(decisions_router)
 app.include_router(copilot_router)
 app.include_router(stats_router)
+app.include_router(console_router)

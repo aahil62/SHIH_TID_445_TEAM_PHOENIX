@@ -1,67 +1,46 @@
 @import "tailwindcss";
 
+/* Forensic-terminal dark theme — the product's identity now, not a
+   prefers-color-scheme fallback. Panels are translucent (rgba, paired
+   with backdrop-blur in Panel.tsx) over a near-black canvas, matching
+   the Team Phoenix design reference (FraudLens.dc.html). */
 :root {
-  --canvas: #f3f4f8;
-  --panel: #ffffff;
-  --foreground: #171b2c;
-  --muted: #626a80;
-  --border: #dfe2ec;
+  --canvas: #050807;
+  --panel: rgba(14, 29, 22, 0.55);
+  --panel-solid: #101a15;
+  --foreground: #f2f5f3;
+  --muted: #a5b0aa;
+  --border: rgba(180, 220, 200, 0.14);
 
-  --graphite: #1c2030;
-  --graphite-foreground: #b7bdd0;
+  --graphite: rgba(8, 16, 12, 0.6);
+  --graphite-foreground: #a5b0aa;
 
-  /* Deep ultramarine — deliberately not Bootstrap/Tailwind's stock blue. */
-  --cobalt: #3538cd;
-  --cobalt-foreground: #ffffff;
+  /* Emerald — the brand accent, replacing the old cobalt-ultramarine. */
+  --cobalt: #16a36a;
+  --cobalt-foreground: #f2f5f3;
 
-  /* Risk semantics — reserved strictly for risk states. Values only
-     change between themes for contrast; the hue identity (green/amber/
-     red, with critical reading as more saturated than high) never does. */
-  --risk-low: #1f8a4c;
-  --risk-low-bg: #e7f6ec;
-  --risk-medium: #b5750a;
-  --risk-medium-bg: #fbf0dd;
-  --risk-high: #c23b22;
-  --risk-high-bg: #fcebe7;
-  --risk-critical: #9c1c1c;
-  --risk-critical-bg: #fbe2e2;
+  /* Warm amber — Fraud DNA / network intelligence accent, distinct from
+     the amber risk tone so pattern-library content reads as its own
+     category rather than "medium risk". */
+  --amber: #d88a45;
 
-  /* Single radius scale, both values well within the ≤8px constraint —
-     sharpened further than the first retheme pass for the terminal/ops-
-     console aesthetic (sharp edges over soft-rounded ones). */
-  --radius-panel: 3px;
-  --radius-control: 2px;
+  /* Risk semantics — reserved strictly for risk states. */
+  --risk-low: #12b76a;
+  --risk-low-bg: rgba(18, 183, 106, 0.12);
+  --risk-medium: #f79009;
+  --risk-medium-bg: rgba(247, 144, 9, 0.12);
+  --risk-high: #f04438;
+  --risk-high-bg: rgba(240, 68, 56, 0.12);
+  --risk-critical: #f04438;
+  --risk-critical-bg: rgba(240, 68, 56, 0.16);
 
-  --shadow-panel: 0 1px 2px rgba(23, 27, 44, 0.05), 0 1px 1px rgba(23, 27, 44, 0.04);
-  --shadow-panel-raised: 0 4px 16px rgba(23, 27, 44, 0.08), 0 1px 2px rgba(23, 27, 44, 0.06);
-}
+  /* Rounder, softer radii than the old sharp-terminal pass — matching the
+     new design reference's glass-panel language. */
+  --radius-panel: 14px;
+  --radius-control: 8px;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --canvas: #0d1018;
-    --panel: #151926;
-    --foreground: #e7e9f2;
-    --muted: #8990a8;
-    --border: #262c40;
-
-    --graphite: #0a0c14;
-    --graphite-foreground: #b7bdd0;
-
-    --cobalt: #7477e8;
-    --cobalt-foreground: #0d1018;
-
-    --risk-low: #3ecf8e;
-    --risk-low-bg: #10251c;
-    --risk-medium: #f0ad3d;
-    --risk-medium-bg: #2a2009;
-    --risk-high: #f0705a;
-    --risk-high-bg: #2c1712;
-    --risk-critical: #ff6b6b;
-    --risk-critical-bg: #341212;
-
-    --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
-    --shadow-panel-raised: 0 8px 24px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  }
+  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 20px rgba(0, 0, 0, 0.35);
+  --shadow-panel-raised: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 28px rgba(0, 0, 0, 0.45);
 }
 
 @theme inline {
@@ -93,7 +72,10 @@
 }
 
 body {
-  background: var(--canvas);
+  background:
+    radial-gradient(900px 600px at 12% 0%, rgba(22, 163, 106, 0.10), transparent 60%),
+    radial-gradient(800px 500px at 88% 25%, rgba(216, 138, 69, 0.06), transparent 62%),
+    var(--canvas);
   color: var(--foreground);
   font-family: var(--font-sans), "Courier New", monospace;
   /* Tabular alignment for scores/amounts across rows — the terminal-grid

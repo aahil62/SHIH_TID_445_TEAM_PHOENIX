@@ -153,6 +153,72 @@ export interface PerformanceStats {
   external_validation: ExternalValidation | null;
 }
 
+// ── Console aggregates (GET /stats/dashboard, /dna/patterns, /audit,
+// /reports, /network/summary) ───────────────────────────────────────────
+
+export interface DashboardStats {
+  critical_alerts: number;
+  pending_reviews: number;
+  blocked_transactions: number;
+  investigations: number;
+  fraud_rings: number;
+  transactions_analyzed: number;
+  risk_trend: { date: string; avg_score: number; count: number }[];
+  agent_averages: { agent_name: string; avg_score: number }[];
+}
+
+export interface DnaPattern {
+  ring_id: string;
+  fraud_type: string;
+  name: string;
+  description: string;
+  matches: number;
+  avg_confidence: number | null;
+}
+
+export type Tone = "red" | "amber" | "green" | "blue";
+
+export interface AuditLogEvent {
+  id: number;
+  case_id: string;
+  txn_id: string | null;
+  event_type: string;
+  actor: string;
+  occurred_at: string;
+  text: string;
+  tone: Tone;
+}
+
+export interface ReportRow {
+  txn_id: string;
+  case_id: string;
+  risk_pct: number;
+  status: string;
+  tone: Tone;
+  analyst: string;
+  created_at: string;
+  report_type: string;
+}
+
+export interface NetworkRing {
+  ring_id: string;
+  txn_id: string;
+  ring_size: number;
+  shared_devices: number;
+  shared_ips: number;
+  fraud_type: string | null;
+  dna_similarity: number | null;
+}
+
+export interface NetworkSummary {
+  ring_count: number;
+  linked_accounts: number;
+  shared_devices: number;
+  shared_ips: number;
+  top_dna_match_pct: number | null;
+  rings: NetworkRing[];
+}
+
 // ── Copilot (POST /copilot/chat) ────────────────────────────────────────────
 // tool_calls is the audit trail proving the answer traces back to a real
 // backend call — see fraudlens/core/copilot/agent.py. Always render it.
