@@ -3,6 +3,7 @@ import type {
   CaseGraphResponse,
   DecisionSubmission,
   HealthResponse,
+  PerformanceStats,
   RecentTransaction,
 } from "./types";
 
@@ -55,4 +56,8 @@ export function getCaseGraph(txnId: string) {
 /** A real liveness check against the backend — never a hardcoded status. */
 export function getHealth() {
   return apiFetch<HealthResponse>(`/health`);
+}
+
+export function getPerformanceStats() {
+  return apiFetch<PerformanceStats>(`/stats/performance`);
 }

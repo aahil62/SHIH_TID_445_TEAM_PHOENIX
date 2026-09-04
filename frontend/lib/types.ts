@@ -109,3 +109,46 @@ export interface CaseGraphResponse {
 export interface HealthResponse {
   status: string;
 }
+
+// ── Model-performance panel (GET /stats/performance) ───────────────────────
+
+export interface AgentPerformance {
+  precision: number;
+  recall: number;
+  f1: number;
+  auc_pr: number;
+  avg_latency_ms: number;
+  p95_latency_ms: number;
+  n_test: number;
+}
+
+export interface PerformanceDataset {
+  total: number;
+  train: number;
+  test: number;
+  fraud_ratio_total: number;
+  fraud_ratio_test: number;
+  pattern_counts: Record<string, number>;
+}
+
+export interface ExternalValidation {
+  dataset: string;
+  total_rows: number;
+  train_rows: number;
+  test_rows: number;
+  fraud_rate: number;
+  precision: number;
+  recall: number;
+  f1: number;
+  auc_pr: number;
+  fit_seconds: number;
+}
+
+export interface PerformanceStats {
+  generated_at: string;
+  dataset: PerformanceDataset;
+  agents: Record<string, AgentPerformance>;
+  ensemble: AgentPerformance;
+  ml_feature_importances: Record<string, number>;
+  external_validation: ExternalValidation | null;
+}

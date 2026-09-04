@@ -13,6 +13,10 @@ frontend/out/
 # Runtime data
 fraudlens/data/*.json
 !fraudlens/data/.gitkeep
+# ...except this one: a fixed, already-computed real result (see
+# fraudlens/evaluation/validate_ulb.py), committed so it's available
+# without the ~140MB source dataset present on the machine serving a demo.
+!fraudlens/data/ulb_validation.json
 
 # Third-party datasets — large, third-party licensed; download via
 # fraudlens/evaluation/validate_ulb.py's docstring instructions, never commit.
