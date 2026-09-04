@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: fraudlens-backend
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn fraudlens.api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: FRAUDLENS_CORS_ORIGINS
+        value: https://fraud-lens.vercel.app
+      - key: FRAUDLENS_JWT_SECRET
+        generateValue: true
