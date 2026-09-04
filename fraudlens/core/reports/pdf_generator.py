@@ -353,8 +353,19 @@ def build_case_report_pdf(case: FraudCase, analyst_decision: Optional[AnalystDec
     """Lay out the full investigation report as a PDF and return its bytes."""
     engine_tone_fg, engine_tone_bg = _tone_for(case.decision.value)
     engine_label = _label_for(case.decision.value)
-    analyst_label = _label_for(analyst_decision.decision) if analyst_decision else "PENDING"
+    if analyst_decision is None:
+        analyst_label = "PENDING"
+    elif analyst_decision.is_false_positive:
+        # Never just "CLEAR" — a false positive was actually flagged and
+        # investigated, not a transaction that was always fine.
+        analyst_label = "FALSE POSITIVE (CLEARED)"
+    else:
+        analyst_label = _label_for(analyst_decision.decision)
     txn = case.transaction
+    # Real-time ingestion (separate work, not built here) may add a
+    # processing timestamp distinct from created_at. Degrade to nothing
+    # if it isn't there yet — never assume the field exists.
+    processed_at = getattr(case, "processed_at", None)
 
     pdf = _CaseReportPDF(format="A4", case_id=case.case_id)
     pdf.set_auto_page_break(auto=True, margin=20)
@@ -368,7 +379,7 @@ def build_case_report_pdf(case: FraudCase, analyst_decision: Optional[AnalystDec
     )
 
     pdf.section_title("Transaction Summary")
-    pdf.kv_grid([
+    transaction_fields = [
         ("Account", mask_identifier(txn.account_id), True),
         ("Amount", f"Rs. {txn.amount:,.2f}", True),
         ("Merchant", f"{mask_identifier(txn.merchant_id)} ({txn.merchant_category})", False),
@@ -377,7 +388,10 @@ def build_case_report_pdf(case: FraudCase, analyst_decision: Optional[AnalystDec
         ("Device", mask_identifier(txn.device_id), True),
         ("IP Address", mask_ip(txn.ip_address), True),
         ("Report Status", "Draft", False),
-    ])
+    ]
+    if processed_at:
+        transaction_fields.append(("Processed At", str(processed_at), True))
+    pdf.kv_grid(transaction_fields)
 
     pdf.section_title("Risk Assessment")
     y = pdf.get_y()
@@ -455,7 +469,13 @@ def build_case_report_pdf(case: FraudCase, analyst_decision: Optional[AnalystDec
             ("Decision", analyst_label, False),
             ("Analyst", analyst_decision.analyst or "Unspecified", False),
         ])
-        pdf.callout_box(analyst_decision.notes or "None provided.", _COBALT)
+        notes_text = analyst_decision.notes or "None provided."
+        if analyst_decision.is_false_positive:
+            notes_text = (
+                "Confirmed false positive - this case was flagged by the engine, "
+                f"investigated, and confirmed not to represent actual fraud.\n\n{notes_text}"
+            )
+        pdf.callout_box(notes_text, _COBALT)
 
     output = pdf.output()
     return bytes(output)

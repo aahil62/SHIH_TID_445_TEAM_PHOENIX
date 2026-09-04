@@ -50,6 +50,7 @@ class ReportGenerator:
             recommended_action=case.recommended_action,
             system_action=case.system_action,
             regulatory_context=regulatory_context,
+            is_false_positive=bool(analyst_decision.is_false_positive) if analyst_decision else False,
             report_status=report_status,
             report_text=report_text,
         )
@@ -72,8 +73,20 @@ class ReportGenerator:
         regulatory_context: list,
     ) -> str:
         engine_badge = _BADGES.get(case.decision.value, case.decision.value.upper())
-        analyst_badge = _BADGES.get(analyst_decision.decision, analyst_decision.decision.upper()) if analyst_decision else "PENDING"
+        if analyst_decision is None:
+            analyst_badge = "PENDING"
+        elif analyst_decision.is_false_positive:
+            # Never just "CLEAR" — a false positive was actually flagged
+            # and investigated, not a transaction that was always fine.
+            analyst_badge = "FALSE POSITIVE (CLEARED)"
+        else:
+            analyst_badge = _BADGES.get(analyst_decision.decision, analyst_decision.decision.upper())
         txn = case.transaction
+        # Real-time ingestion (separate work, not built here) may add a
+        # processing timestamp distinct from created_at (when the case
+        # object itself was built). Degrade to nothing if it isn't there
+        # yet — never assume the field exists.
+        processed_at = getattr(case, "processed_at", None)
 
         sections = [
             f"# Investigation Report\n\n"
@@ -92,7 +105,8 @@ class ReportGenerator:
             f"| **Timestamp** | {txn.timestamp} |\n"
             f"| **Channel** | {txn.channel} |\n"
             f"| **Device** | `{mask_identifier(txn.device_id)}` |\n"
-            f"| **IP** | `{mask_ip(txn.ip_address)}` |",
+            f"| **IP** | `{mask_ip(txn.ip_address)}` |"
+            + (f"\n| **Processed at** | {processed_at} |" if processed_at else ""),
 
             f"## Risk Assessment\n\n"
             f"| Metric | Value |\n|---|---|\n"
@@ -157,11 +171,18 @@ class ReportGenerator:
         sections.append(f"## Recommended Action\n\n{case.recommended_action}")
 
         if analyst_decision:
+            false_positive_note = (
+                "\n\n**Confirmed false positive** — this case was flagged by the engine, "
+                "investigated, and confirmed not to represent actual fraud."
+                if analyst_decision.is_false_positive
+                else ""
+            )
             sections.append(
                 f"## Analyst Decision\n\n"
                 f"**Decision:** {analyst_badge}\n\n"
                 f"**Analyst:** {analyst_decision.analyst or 'Unspecified'}\n\n"
                 f"**Notes:** {analyst_decision.notes or 'None provided.'}"
+                f"{false_positive_note}"
             )
 
         sections.append(
