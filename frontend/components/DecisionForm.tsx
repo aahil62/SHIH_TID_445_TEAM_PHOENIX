@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitDecision } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import type { Decision } from "@/lib/types";
 import { DECISION_LABEL, DECISION_TONE } from "@/lib/risk";
 
@@ -25,15 +26,45 @@ export default function DecisionForm({
   const [selected, setSelected] = useState<Decision>(currentDecision);
   const [notes, setNotes] = useState("");
   const [notesOpen, setNotesOpen] = useState(!compact);
-  const [status, setStatus] = useState<"idle" | "error" | "success">("idle");
+  const [isFalsePositive, setIsFalsePositive] = useState(false);
+  const [status, setStatus] = useState<"idle" | "error" | "success" | "unauthenticated">("idle");
   const [isPending, startTransition] = useTransition();
+
+  // Only a case the engine actually flagged can be "corrected" to a false
+  // positive — marking one on a transaction that was never risky isn't a
+  // correction of anything. Gated on the engine's own recommendation
+  // (currentDecision), same source of truth the backend validates against.
+  const wasFlagged = currentDecision !== "clear";
+
+  function handleSelectDecision(option: Decision) {
+    setSelected(option);
+    if (option !== "clear") setIsFalsePositive(false);
+  }
+
+  function handleFalsePositiveToggle(checked: boolean) {
+    setIsFalsePositive(checked);
+    if (checked) setSelected("clear");
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("idle");
+    const token = getToken();
+    if (!token) {
+      setStatus("unauthenticated");
+      return;
+    }
     startTransition(async () => {
       try {
-        await submitDecision({ txn_id: txnId, decision: selected, notes: notes || undefined });
+        await submitDecision(
+          {
+            txn_id: txnId,
+            decision: selected,
+            notes: notes || undefined,
+            is_false_positive: isFalsePositive || undefined,
+          },
+          token,
+        );
         setStatus("success");
         router.refresh();
       } catch {
@@ -55,7 +86,7 @@ export default function DecisionForm({
             <button
               key={option}
               type="button"
-              onClick={() => setSelected(option)}
+              onClick={() => handleSelectDecision(option)}
               className={`cursor-pointer rounded-[var(--radius-control)] border font-medium transition-[filter,background-color,border-color] hover:brightness-110 ${
                 compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm"
               }`}
@@ -70,6 +101,26 @@ export default function DecisionForm({
           );
         })}
       </div>
+
+      {wasFlagged && (
+        <label className="flex items-start gap-2 text-sm" style={{ color: "var(--foreground)" }}>
+          <input
+            type="checkbox"
+            checked={isFalsePositive}
+            onChange={(e) => handleFalsePositiveToggle(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            This was a false positive — investigation confirmed no actual fraud
+            {!compact && (
+              <span className="block text-xs" style={{ color: "var(--muted)" }}>
+                Distinct from an ordinary Clear: records that this case was flagged and
+                investigated, not just cleared.
+              </span>
+            )}
+          </span>
+        </label>
+      )}
 
       {compact && !notesOpen && (
         <button
@@ -115,7 +166,7 @@ export default function DecisionForm({
             style={{ color: "var(--risk-low)" }}
           >
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-            Decision recorded.
+            {isFalsePositive ? "Marked as a false positive." : "Decision recorded."}
           </span>
         )}
         {status === "error" && (
@@ -125,6 +176,15 @@ export default function DecisionForm({
           >
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
             Couldn&apos;t submit. Try again.
+          </span>
+        )}
+        {status === "unauthenticated" && (
+          <span
+            className="inline-flex items-center gap-1.5 text-xs font-medium"
+            style={{ color: "var(--risk-high)" }}
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+            You&apos;re not signed in — decisions require a logged-in analyst.
           </span>
         )}
       </div>

@@ -94,6 +94,45 @@ class DecisionWorkflowTests(unittest.TestCase):
         record = workflow.submit_decision(case, "clear", analyst="alice")
         self.assertTrue(record.is_override)
 
+    def test_false_positive_requires_decision_clear(self) -> None:
+        workflow = self._workflow()
+        case = _case(decision=Decision.BLOCK)
+        with self.assertRaises(DecisionWorkflowError):
+            workflow.submit_decision(case, "block", analyst="alice", is_false_positive=True)
+
+    def test_false_positive_requires_case_was_actually_flagged(self) -> None:
+        workflow = self._workflow()
+        case = _case(decision=Decision.CLEAR)
+        with self.assertRaises(DecisionWorkflowError):
+            workflow.submit_decision(case, "clear", analyst="alice", is_false_positive=True)
+
+    def test_false_positive_recorded_on_a_flagged_case(self) -> None:
+        workflow = self._workflow()
+        case = _case(decision=Decision.BLOCK_AND_REPORT)
+        record = workflow.submit_decision(
+            case, "clear", analyst="alice", notes="Investigated, not fraud", is_false_positive=True,
+        )
+        self.assertEqual(record.decision, "clear")
+        self.assertTrue(record.is_false_positive)
+
+    def test_ordinary_clear_decision_is_not_a_false_positive(self) -> None:
+        """A transaction that was simply never flagged must not look like
+        a false positive just because is_false_positive defaults False."""
+        workflow = self._workflow()
+        case = _case(decision=Decision.CLEAR)
+        record = workflow.submit_decision(case, "clear", analyst="alice")
+        self.assertFalse(record.is_false_positive)
+
+    def test_false_positive_audit_event_carries_the_flag(self) -> None:
+        workflow = self._workflow()
+        case = _case(decision=Decision.BLOCK)
+        workflow.submit_decision(
+            case, "clear", analyst="alice", notes="Not fraud", is_false_positive=True,
+        )
+        events = workflow.get_audit_trail(case.case_id)
+        decision_event = next(e for e in events if e.event_type == "analyst_decision")
+        self.assertTrue(decision_event.metadata.get("is_false_positive"))
+
     def test_downgrading_ring_linked_block_is_high_risk_override(self) -> None:
         workflow = self._workflow()
         case = _case(decision=Decision.BLOCK_AND_REPORT, graph_evidence=_ring_evidence())

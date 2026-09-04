@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { getHealth } from "@/lib/api";
+import { clearSession, getStoredAnalyst } from "@/lib/auth";
 
 const NAV_ITEMS: { label: string; href: string; icon: React.ReactNode }[] = [
   {
@@ -15,6 +16,16 @@ const NAV_ITEMS: { label: string; href: string; icon: React.ReactNode }[] = [
         <rect x="14" y="3" width="7" height="7" rx="1.5" />
         <rect x="3" y="14" width="7" height="7" rx="1.5" />
         <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </>
+    ),
+  },
+  {
+    label: "Live Feed",
+    href: "/live",
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3.5 2" />
       </>
     ),
   },
@@ -97,6 +108,7 @@ const NAV_ITEMS: { label: string; href: string; icon: React.ReactNode }[] = [
 
 const BREADCRUMB: Record<string, string> = {
   "/dashboard": "Risk Intelligence",
+  "/live": "Live Transaction Feed",
   "/feed": "Alert Feed",
   "/cases": "Investigations",
   "/case": "Investigation",
@@ -150,6 +162,49 @@ function StatusIndicator() {
       <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
       {label}
     </span>
+  );
+}
+
+// No-op subscribe: the stored analyst never changes without a full
+// navigation (login/signup/logout all call router.push/refresh), so there's
+// no external event to listen for — useSyncExternalStore here exists only
+// to read localStorage safely without a hydration mismatch (server always
+// has no analyst; the client snapshot is read on mount, not during SSR).
+function subscribeNever() {
+  return () => {};
+}
+
+function AnalystBadge() {
+  const router = useRouter();
+  const analyst = useSyncExternalStore(subscribeNever, getStoredAnalyst, () => null);
+
+  function handleLogout() {
+    clearSession();
+    router.push("/login");
+    router.refresh();
+  }
+
+  if (!analyst) return null;
+
+  return (
+    <div className="flex items-center gap-3 pl-4" style={{ borderLeft: "1px solid var(--border)" }}>
+      <div
+        className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold"
+        style={{ backgroundColor: "rgba(22,163,106,0.16)", color: "var(--cobalt)" }}
+      >
+        {analyst.display_name.charAt(0)}
+      </div>
+      <span className="text-xs font-medium" style={{ color: "var(--foreground)" }}>
+        {analyst.display_name}
+      </span>
+      <button
+        onClick={handleLogout}
+        className="text-xs font-medium"
+        style={{ color: "var(--muted)" }}
+      >
+        Log out
+      </button>
+    </div>
   );
 }
 
@@ -215,8 +270,9 @@ export default function ConsoleShell({ children }: { children: React.ReactNode }
           <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
             {breadcrumb}
           </span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-4">
             <StatusIndicator />
+            <AnalystBadge />
           </div>
         </div>
         <div

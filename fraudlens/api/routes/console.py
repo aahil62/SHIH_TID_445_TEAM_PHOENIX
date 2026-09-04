@@ -97,6 +97,8 @@ def get_dashboard() -> dict[str, Any]:
         for name, scores in sorted(agent_totals.items())
     ]
 
+    restricted_accounts = sum(1 for r in runtime.account_restriction_store.all() if r.is_active)
+
     return {
         "critical_alerts": critical_alerts,
         "pending_reviews": pending_reviews,
@@ -104,6 +106,7 @@ def get_dashboard() -> dict[str, Any]:
         "investigations": investigations,
         "fraud_rings": len(ring_ids),
         "transactions_analyzed": len(cases),
+        "restricted_accounts": restricted_accounts,
         "risk_trend": risk_trend,
         "agent_averages": agent_averages,
     }
@@ -177,6 +180,12 @@ def _describe_event(event: AuditEvent) -> tuple[str, str]:
     if event.event_type == "analyst_decision":
         analyst = meta.get("analyst") or "unknown"
         decision = str(meta.get("decision", "")).upper()
+        if meta.get("is_false_positive"):
+            # Distinct from a routine "recorded decision: CLEAR" — this
+            # case was actually flagged, investigated, and confirmed to
+            # NOT be fraud, not a transaction that was always fine.
+            text = f"{analyst} marked case as a false positive — did not represent actual fraud"
+            return text, "blue"
         if meta.get("reversed_autonomous_action"):
             text = f"{analyst} reviewed the auto-held case and recorded {decision}"
         elif meta.get("high_risk_override"):
@@ -184,6 +193,12 @@ def _describe_event(event: AuditEvent) -> tuple[str, str]:
         else:
             text = f"{analyst} recorded decision: {decision}"
         return text, _DECISION_TONE.get(meta.get("decision", ""), "blue")
+    if event.event_type == "account_restriction_applied":
+        hint = meta.get("account_id_masked_hint", "")
+        return f"System tightened velocity limits on account ••{hint} (auto-applied)", "amber"
+    if event.event_type == "account_restriction_released":
+        hint = meta.get("account_id_masked_hint", "")
+        return f"{event.actor} lifted the velocity restriction on account ••{hint}", "green"
     return event.event_type.replace("_", " ").title(), "blue"
 
 
@@ -227,7 +242,10 @@ def list_reports(limit: int = 50) -> dict[str, Any]:
     for c in cases:
         decision_record = runtime.decision_workflow.get_decision(c.case_id)
         if decision_record:
-            status = decision_record.decision.upper()
+            # A confirmed false positive reads identically to a routine
+            # "CLEAR" otherwise — this case was actually flagged and
+            # investigated, not a transaction that was always fine.
+            status = "FALSE POSITIVE" if decision_record.is_false_positive else decision_record.decision.upper()
             analyst = decision_record.analyst or "—"
         elif c.system_action:
             status = "AUTO-HELD"

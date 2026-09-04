@@ -7,7 +7,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any, Optional
 
-from fraudlens.models.schemas import FraudCase, FraudGraph, Transaction
+from fraudlens.models.schemas import AnalystDecision, FraudCase, FraudGraph, Transaction
 
 
 def mask_identifier(value: str, visible: int = 4) -> str:
@@ -43,7 +43,7 @@ def public_transaction(txn: Transaction) -> dict[str, Any]:
     }
 
 
-def public_case(case: FraudCase) -> dict[str, Any]:
+def public_case(case: FraudCase, analyst_decision: Optional[AnalystDecision] = None) -> dict[str, Any]:
     data = case.model_dump()
     data["transaction"] = public_transaction(case.transaction)
     for score in data["agent_scores"]:
@@ -53,6 +53,13 @@ def public_case(case: FraudCase) -> dict[str, Any]:
         ge["connected_accounts"] = [mask_identifier(v) for v in case.graph_evidence.connected_accounts]
         ge["shared_devices"] = [mask_identifier(v) for v in case.graph_evidence.shared_devices]
         ge["shared_ips"] = [mask_ip(v) for v in case.graph_evidence.shared_ips]
+    # The analyst's own recorded decision — distinct from `decision` above,
+    # which is always the engine's own recommendation and never changes
+    # once the case is analyzed. `is_false_positive` is the explicit fact
+    # this needs to be inspectable, not inferred from decision=="clear"
+    # (which is also true of a transaction that was never flagged at all).
+    data["analyst_decision"] = analyst_decision.decision if analyst_decision else None
+    data["is_false_positive"] = bool(analyst_decision.is_false_positive) if analyst_decision else False
     return data
 
 

@@ -29,3 +29,5 @@ def use_isolated_data_dir() -> None:
     os.environ["FRAUDLENS_DNA_STORE_PATH"] = os.path.join(data_dir, "fraud_dna_library.json")
     os.environ["FRAUDLENS_DECISIONS_PATH"] = os.path.join(data_dir, "analyst_decisions.json")
     os.environ["FRAUDLENS_AUDIT_PATH"] = os.path.join(data_dir, "audit_log.json")
+    os.environ["FRAUDLENS_ANALYSTS_PATH"] = os.path.join(data_dir, "analysts.json")
+    os.environ["FRAUDLENS_ACCOUNT_RESTRICTIONS_PATH"] = os.path.join(data_dir, "account_restrictions.json")

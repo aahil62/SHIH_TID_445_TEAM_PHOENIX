@@ -125,6 +125,33 @@ export default async function CasePage({
             <span className="text-sm font-bold tracking-wide" style={{ color: tone.fg }}>
               {RISK_TIER_LABEL[caseDetail.decision]}
             </span>
+            {caseDetail.system_action === "auto_held" && (
+              <span
+                className="rounded-[var(--radius-control)] px-2 py-0.5 text-[11px] font-bold tracking-wide"
+                style={{ backgroundColor: "var(--risk-medium-bg)", color: "var(--risk-medium)" }}
+                title="Held automatically pending review — no real transaction was stopped. Clears the instant an analyst records a decision."
+              >
+                AUTO-HELD
+              </span>
+            )}
+            {caseDetail.is_false_positive && (
+              <span
+                className="rounded-[var(--radius-control)] px-2 py-0.5 text-[11px] font-bold tracking-wide"
+                style={{ backgroundColor: "var(--cobalt)", color: "var(--cobalt-foreground)" }}
+                title="This case was flagged by the engine, investigated, and confirmed to NOT represent actual fraud — distinct from a transaction that was simply never risky."
+              >
+                FALSE POSITIVE
+              </span>
+            )}
+            {caseDetail.account_restricted && (
+              <span
+                className="rounded-[var(--radius-control)] px-2 py-0.5 text-[11px] font-bold tracking-wide"
+                style={{ backgroundColor: "rgba(216,138,69,0.14)", color: "var(--amber)" }}
+                title="This account's velocity thresholds are tightened, auto-applied after a prior high-confidence hold. Clears the instant an analyst records a decision on the triggering case."
+              >
+                ACCOUNT RESTRICTED
+              </span>
+            )}
             <span className="font-mono text-sm font-semibold">
               {formatAmount(transaction.amount)} transaction
             </span>

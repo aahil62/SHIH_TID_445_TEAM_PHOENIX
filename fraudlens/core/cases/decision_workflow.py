@@ -10,6 +10,18 @@ That combination — reversing a ring-linked block — is exactly the
 situation this branch's graph/ring evidence needs to surface loudest, so
 it gets called out explicitly in the audit metadata rather than logged
 identically to any other override.
+
+Also tracks false positives as their own explicit fact, not a silent
+decision=clear: a false positive is a case the engine flagged (review/
+block/block_and_report) that an analyst investigated and confirmed did
+NOT represent actual fraud. That's a different claim from "this
+transaction was never risky" — see submit_decision's is_false_positive
+parameter — and it must never reach CaseEngine.confirm_fraud_dna(): a
+confirmed non-fraud case has no business teaching the Fraud DNA library
+what fraud looks like. The route-level gate lives in
+api/routes/decisions.py; validation here (decision must be "clear", the
+case must have actually been flagged) makes the two facts impossible to
+submit in a contradictory combination in the first place.
 """
 
 from __future__ import annotations
@@ -70,11 +82,31 @@ class DecisionWorkflow:
         decision: str,
         analyst: Optional[str] = None,
         notes: Optional[str] = None,
+        is_false_positive: bool = False,
     ) -> AnalystDecision:
         if decision not in _VALID_DECISIONS:
             raise DecisionWorkflowError(
                 f"Unknown decision {decision!r}; expected one of {sorted(_VALID_DECISIONS)}"
             )
+
+        if is_false_positive:
+            # A false positive is a specific, narrower claim than "clear":
+            # a case the engine actually flagged, that an analyst
+            # investigated and confirmed was NOT fraud. Both halves of that
+            # claim are enforced here rather than trusted from the caller —
+            # "not fraud" only ever resolves to decision=clear, and marking
+            # something false-positive that was never flagged in the first
+            # place isn't a correction of anything.
+            if decision != Decision.CLEAR.value:
+                raise DecisionWorkflowError(
+                    "is_false_positive requires decision='clear' — a false positive is a "
+                    "confirmed non-fraud finding, not a partial downgrade"
+                )
+            if case.decision.value == Decision.CLEAR.value:
+                raise DecisionWorkflowError(
+                    "Cannot mark a case false-positive — the engine never flagged it "
+                    f"(decision={case.decision.value!r})"
+                )
 
         is_override = decision != case.decision.value
         high_risk_override = self.is_high_risk_override(case, decision)
@@ -101,6 +133,7 @@ class DecisionWorkflow:
             notes=notes,
             decided_at=_now_iso(),
             is_override=is_override,
+            is_false_positive=is_false_positive,
         )
         self._next_decision_id += 1
         self._decisions[case.case_id] = record
@@ -112,6 +145,8 @@ class DecisionWorkflow:
             "is_override": is_override,
             "analyst": analyst,
         }
+        if is_false_positive:
+            audit_metadata["is_false_positive"] = True
         if high_risk_override:
             audit_metadata["high_risk_override"] = True
             audit_metadata["ring_id"] = case.graph_evidence.ring_id
@@ -155,6 +190,34 @@ class DecisionWorkflow:
 
         return self._log_event(
             case.case_id, case.txn_id, "autonomous_action", "system", metadata
+        )
+
+    def record_account_restriction_applied(self, case: FraudCase, account_id: str) -> Optional[AuditEvent]:
+        """Log the account-level velocity restriction as its own distinct
+        event, separate from "autonomous_action" (the case-level hold) —
+        this one is about the account, and its effect on future
+        transactions is what makes autonomy in this system a real action,
+        not just a label. Idempotent per case, same pattern as
+        record_autonomous_action."""
+        if any(
+            e.case_id == case.case_id and e.event_type == "account_restriction_applied"
+            for e in self._audit_events
+        ):
+            return None
+        return self._log_event(
+            case.case_id, case.txn_id, "account_restriction_applied", "system",
+            {"account_id_masked_hint": account_id[-4:] if len(account_id) >= 4 else account_id},
+        )
+
+    def record_account_restriction_released(
+        self, case: FraudCase, account_id: str, released_by: str
+    ) -> AuditEvent:
+        """Logged the moment a human reverses the case that triggered the
+        restriction — always reversible by a human, exactly like the
+        case-level auto-hold."""
+        return self._log_event(
+            case.case_id, case.txn_id, "account_restriction_released", released_by,
+            {"account_id_masked_hint": account_id[-4:] if len(account_id) >= 4 else account_id},
         )
 
     def get_decision(self, case_id: str) -> Optional[AnalystDecision]:

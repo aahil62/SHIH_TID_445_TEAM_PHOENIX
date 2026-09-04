@@ -26,12 +26,13 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Critical Alerts" value={stats.critical_alerts} color="var(--risk-critical)" href="/feed" />
         <StatCard label="Pending Reviews" value={stats.pending_reviews} color="var(--risk-medium)" href="/feed" />
         <StatCard label="Blocked Transactions" value={stats.blocked_transactions} href="/reports" />
         <StatCard label="Investigations" value={stats.investigations} href="/cases" />
         <StatCard label="Fraud Rings" value={stats.fraud_rings} color="var(--amber)" href="/network" />
+        <StatCard label="Accounts Restricted" value={stats.restricted_accounts} color="var(--amber)" />
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">

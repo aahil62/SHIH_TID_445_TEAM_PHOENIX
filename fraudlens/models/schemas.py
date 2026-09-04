@@ -153,6 +153,11 @@ class FraudCase(BaseModel):
     # DecisionWorkflow.submit_decision().
     system_action: Optional[str] = None
     system_action_overridden_at: Optional[str] = None
+    # True when this transaction's account is currently under the bounded
+    # autonomous velocity restriction (see
+    # fraudlens/core/cases/account_restriction.py) — never exposes the raw
+    # account_id, just the fact that a restriction is active.
+    account_restricted: bool = False
 
 
 # ── Analyst workflow (populated by feature/graph-behavioral in Stage B) ─────
@@ -166,6 +171,13 @@ class AnalystDecision(BaseModel):
     notes: Optional[str] = None
     decided_at: str
     is_override: bool = False
+    # A flagged case (review/block/block_and_report) an analyst investigated
+    # and confirmed did NOT represent actual fraud — a distinct fact from
+    # `decision` itself (always "clear" when this is True; see
+    # DecisionWorkflow.submit_decision's validation), so a false-positive
+    # correction is never conflated with an ordinary clear that was never
+    # flagged in the first place. See fraudlens/core/cases/decision_workflow.py.
+    is_false_positive: bool = False
 
 
 class AuditEvent(BaseModel):
@@ -176,6 +188,26 @@ class AuditEvent(BaseModel):
     actor: str
     occurred_at: str
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+# ── Autonomous account restriction ───────────────────────────────────────
+#
+# The second half of "bounded autonomous action": alongside auto-holding a
+# single case, the system can tighten an account's velocity thresholds
+# going forward — a real, measurable consequence, not just another label.
+# See fraudlens/core/cases/account_restriction.py.
+
+class AccountRestriction(BaseModel):
+    account_id: str
+    reason_txn_id: str
+    reason_case_id: str
+    applied_at: str
+    released_at: Optional[str] = None
+    released_by: Optional[str] = None
+
+    @property
+    def is_active(self) -> bool:
+        return self.released_at is None
 
 
 # ── Regulatory context (populated by main in Stage C) ────────────────────
@@ -213,6 +245,7 @@ class FraudReport(BaseModel):
     recommended_action: str
     system_action: Optional[str] = None
     regulatory_context: list[RegulatoryReference] = Field(default_factory=list)
+    is_false_positive: bool = False
     report_status: str = "draft"
     generated_at: str = Field(default_factory=_now_iso)
     report_text: str = ""
@@ -240,3 +273,37 @@ class CopilotResponse(BaseModel):
     # entry — guaranteed by construction in CopilotAgent, never asserted by
     # the LLM itself.
     grounded: bool = True
+
+
+# ── Analyst authentication ───────────────────────────────────────────────
+
+class AnalystAccount(BaseModel):
+    """Internal record — password_hash never leaves the backend. See
+    AnalystProfile for what an API response is allowed to expose."""
+    username: str
+    display_name: str
+    password_hash: str
+    created_at: str
+
+
+class AnalystProfile(BaseModel):
+    """The public-safe view of an AnalystAccount — no password_hash."""
+    username: str
+    display_name: str
+
+
+class SignupRequest(BaseModel):
+    username: str
+    display_name: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    analyst: AnalystProfile

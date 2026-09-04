@@ -11,11 +11,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fraudlens.api.routes.auth import router as auth_router
 from fraudlens.api.routes.cases import router as cases_router
 from fraudlens.api.routes.console import router as console_router
 from fraudlens.api.routes.copilot import router as copilot_router
 from fraudlens.api.routes.decisions import router as decisions_router
 from fraudlens.api.routes.health import router as health_router
+from fraudlens.api.routes.live import router as live_router
 from fraudlens.api.routes.reports import router as reports_router
 from fraudlens.api.routes.stats import router as stats_router
 from fraudlens.api.routes.transactions import router as transactions_router
@@ -51,6 +53,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(transactions_router)
 app.include_router(cases_router)
@@ -59,3 +62,4 @@ app.include_router(decisions_router)
 app.include_router(copilot_router)
 app.include_router(stats_router)
 app.include_router(console_router)
+app.include_router(live_router)

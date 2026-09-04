@@ -25,7 +25,7 @@ class ConsoleApiTests(unittest.TestCase):
         data = resp.json()
         for key in (
             "critical_alerts", "pending_reviews", "blocked_transactions",
-            "investigations", "fraud_rings", "transactions_analyzed",
+            "investigations", "fraud_rings", "transactions_analyzed", "restricted_accounts",
         ):
             self.assertIn(key, data)
             self.assertGreaterEqual(data[key], 0)
@@ -33,6 +33,9 @@ class ConsoleApiTests(unittest.TestCase):
         # since blocked is a subset of non-clear decisions.
         self.assertGreaterEqual(data["investigations"], data["blocked_transactions"])
         self.assertGreaterEqual(data["blocked_transactions"], data["critical_alerts"])
+        # At least one account genuinely auto-restricted under seed=42 (see
+        # tests/test_account_restriction.py for the full lifecycle).
+        self.assertGreater(data["restricted_accounts"], 0)
         self.assertIsInstance(data["risk_trend"], list)
         self.assertIsInstance(data["agent_averages"], list)
         agent_names = {a["agent_name"] for a in data["agent_averages"]}
@@ -82,16 +85,21 @@ class ConsoleApiTests(unittest.TestCase):
         events = self.client.get("/audit?limit=3").json()["events"]
         self.assertLessEqual(len(events), 3)
 
+    def _auth_headers(self) -> dict:
+        login = self.client.post("/auth/login", json={"username": "riyer", "password": "fraudlens123"})
+        token = login.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
     def test_global_audit_reflects_a_real_analyst_decision(self) -> None:
         txn_id = self.client.get("/transactions/recent?limit=1").json()["transactions"][0]["txn_id"]
         self.client.get(f"/cases/{txn_id}")
-        self.client.post("/decisions", json={
-            "txn_id": txn_id, "decision": "review", "analyst": "console-test-analyst",
-        })
+        self.client.post(
+            "/decisions", json={"txn_id": txn_id, "decision": "review"}, headers=self._auth_headers()
+        )
         events = self.client.get("/audit?limit=200").json()["events"]
         matching = [e for e in events if e["txn_id"] == txn_id and e["event_type"] == "analyst_decision"]
         self.assertTrue(matching)
-        self.assertIn("console-test-analyst", matching[0]["text"])
+        self.assertIn("R. Iyer", matching[0]["text"])
 
     def test_reports_list_returns_rows_sorted_highest_risk_first(self) -> None:
         resp = self.client.get("/reports?limit=20")
@@ -108,15 +116,55 @@ class ConsoleApiTests(unittest.TestCase):
     def test_reports_list_shows_real_decision_status_when_recorded(self) -> None:
         txn_id = self.client.get("/transactions/recent?limit=1").json()["transactions"][0]["txn_id"]
         self.client.get(f"/cases/{txn_id}")
-        self.client.post("/decisions", json={
-            "txn_id": txn_id, "decision": "block", "analyst": "reports-test-analyst",
-        })
+        self.client.post(
+            "/decisions", json={"txn_id": txn_id, "decision": "block"}, headers=self._auth_headers()
+        )
         # limit comfortably above the full synthetic dataset size (1,037)
         # so the queried txn is guaranteed to appear regardless of rank.
         rows = self.client.get("/reports?limit=2000").json()["rows"]
         row = next(r for r in rows if r["txn_id"] == txn_id)
         self.assertEqual(row["status"], "BLOCK")
-        self.assertEqual(row["analyst"], "reports-test-analyst")
+        self.assertEqual(row["analyst"], "R. Iyer")
+
+    def test_reports_list_shows_false_positive_status_distinctly(self) -> None:
+        # A confirmed false positive must read differently from a routine
+        # CLEAR status — this case was actually flagged and investigated,
+        # not a transaction that was always fine.
+        txn_id = "TXN-AF493E2FCD007CAD"  # deterministic block_and_report ring transaction
+        self.client.get(f"/cases/{txn_id}")
+        self.client.post(
+            "/decisions",
+            json={"txn_id": txn_id, "decision": "clear", "is_false_positive": True},
+            headers=self._auth_headers(),
+        )
+        rows = self.client.get("/reports?limit=2000").json()["rows"]
+        row = next(r for r in rows if r["txn_id"] == txn_id)
+        self.assertEqual(row["status"], "FALSE POSITIVE")
+        self.assertNotEqual(row["status"], "CLEAR")
+        # The analyst name comes from the authenticated session (riyer ->
+        # "R. Iyer"), not client-supplied text — DecisionRequest no longer
+        # even accepts an `analyst` field.
+        self.assertEqual(row["analyst"], "R. Iyer")
+
+    def test_global_audit_reflects_a_false_positive_correction_distinctly(self) -> None:
+        txn_id = "TXN-AF493E2FCD007CAD"
+        self.client.get(f"/cases/{txn_id}")
+        self.client.post(
+            "/decisions",
+            json={"txn_id": txn_id, "decision": "clear", "is_false_positive": True},
+            headers=self._auth_headers(),
+        )
+        events = self.client.get("/audit?limit=200").json()["events"]
+        matching = [
+            e for e in events
+            if e["txn_id"] == txn_id and e["event_type"] == "analyst_decision"
+            and "false positive" in e["text"].lower()
+        ]
+        self.assertTrue(matching)
+        self.assertIn("R. Iyer", matching[0]["text"])
+        # Not the generic "recorded decision: CLEAR" phrasing an ordinary
+        # clear decision would get.
+        self.assertNotIn("recorded decision", matching[0]["text"].lower())
 
     def test_network_summary_finds_a_known_ring(self) -> None:
         resp = self.client.get("/network/summary")
