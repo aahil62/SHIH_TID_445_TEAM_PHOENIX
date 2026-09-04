@@ -18,15 +18,37 @@ export default function DecisionForm({
   const router = useRouter();
   const [selected, setSelected] = useState<Decision>(currentDecision);
   const [notes, setNotes] = useState("");
+  const [isFalsePositive, setIsFalsePositive] = useState(false);
   const [status, setStatus] = useState<"idle" | "error" | "success">("idle");
   const [isPending, startTransition] = useTransition();
+
+  // Only a case the engine actually flagged can be "corrected" to a false
+  // positive — marking one on a transaction that was never risky isn't a
+  // correction of anything. Gated on the engine's own recommendation
+  // (currentDecision), same source of truth the backend validates against.
+  const wasFlagged = currentDecision !== "clear";
+
+  function handleSelectDecision(option: Decision) {
+    setSelected(option);
+    if (option !== "clear") setIsFalsePositive(false);
+  }
+
+  function handleFalsePositiveToggle(checked: boolean) {
+    setIsFalsePositive(checked);
+    if (checked) setSelected("clear");
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("idle");
     startTransition(async () => {
       try {
-        await submitDecision({ txn_id: txnId, decision: selected, notes: notes || undefined });
+        await submitDecision({
+          txn_id: txnId,
+          decision: selected,
+          notes: notes || undefined,
+          is_false_positive: isFalsePositive || undefined,
+        });
         setStatus("success");
         router.refresh();
       } catch {
@@ -45,7 +67,7 @@ export default function DecisionForm({
             <button
               key={option}
               type="button"
-              onClick={() => setSelected(option)}
+              onClick={() => handleSelectDecision(option)}
               className="rounded-[var(--radius-control)] border px-3 py-1.5 text-sm font-medium transition-colors"
               style={{
                 borderColor: isSelected ? tone.fg : "var(--border)",
@@ -58,6 +80,24 @@ export default function DecisionForm({
           );
         })}
       </div>
+
+      {wasFlagged && (
+        <label className="flex items-start gap-2 text-sm" style={{ color: "var(--foreground)" }}>
+          <input
+            type="checkbox"
+            checked={isFalsePositive}
+            onChange={(e) => handleFalsePositiveToggle(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            This was a false positive — investigation confirmed no actual fraud
+            <span className="block text-xs" style={{ color: "var(--muted)" }}>
+              Distinct from an ordinary Clear: records that this case was flagged and
+              investigated, not just cleared.
+            </span>
+          </span>
+        </label>
+      )}
 
       <textarea
         value={notes}
@@ -83,7 +123,7 @@ export default function DecisionForm({
             style={{ color: "var(--risk-low)" }}
           >
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
-            Decision recorded.
+            {isFalsePositive ? "Marked as a false positive." : "Decision recorded."}
           </span>
         )}
         {status === "error" && (
