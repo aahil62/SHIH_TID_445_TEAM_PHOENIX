@@ -5,6 +5,7 @@ import type {
   CopilotResponse,
   DecisionSubmission,
   HealthResponse,
+  PerformanceStats,
   RecentTransaction,
 } from "./types";
 
@@ -68,4 +69,8 @@ export function askCopilot(payload: CopilotRequest) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function getPerformanceStats() {
+  return apiFetch<PerformanceStats>(`/stats/performance`);
 }
