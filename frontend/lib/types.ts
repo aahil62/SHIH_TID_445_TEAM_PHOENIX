@@ -109,3 +109,22 @@ export interface CaseGraphResponse {
 export interface HealthResponse {
   status: string;
 }
+
+// ── Copilot (POST /copilot/chat) ────────────────────────────────────────────
+
+export interface CopilotToolCall {
+  tool: string;
+  input: Record<string, unknown>;
+  output: Record<string, unknown>;
+}
+
+export interface CopilotRequest {
+  question: string;
+  txn_id?: string;
+}
+
+export interface CopilotResponse {
+  answer: string;
+  tool_calls: CopilotToolCall[];
+  grounded: boolean;
+}

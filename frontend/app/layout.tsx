@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Share_Tech_Mono } from "next/font/google";
+import CopilotWidget from "@/components/CopilotWidget";
 import NavRail from "@/components/NavRail";
 import SampleBanner from "@/components/SampleBanner";
 import TopBar from "@/components/TopBar";
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
           </div>
         </div>
+        <CopilotWidget />
       </body>
     </html>
   );

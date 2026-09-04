@@ -1,6 +1,8 @@
 import type {
   Case,
   CaseGraphResponse,
+  CopilotRequest,
+  CopilotResponse,
   DecisionSubmission,
   HealthResponse,
   RecentTransaction,
@@ -55,4 +57,15 @@ export function getCaseGraph(txnId: string) {
 /** A real liveness check against the backend — never a hardcoded status. */
 export function getHealth() {
   return apiFetch<HealthResponse>(`/health`);
+}
+
+/** Every answer traces back to a real CopilotToolCall against CaseEngine —
+ * see fraudlens/core/copilot/agent.py. Throws (503) when GROQ_API_KEY isn't
+ * configured server-side; callers must show that as an explicit
+ * "unavailable" state, never a fabricated reply. */
+export function askCopilot(payload: CopilotRequest) {
+  return apiFetch<CopilotResponse>(`/copilot/chat`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
