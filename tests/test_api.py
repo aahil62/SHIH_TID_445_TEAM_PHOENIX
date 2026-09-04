@@ -57,6 +57,29 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(report["txn_id"], txn_id)
         self.assertIn("Investigation Report", report["report_text"])
 
+    def test_report_pdf_download_for_normal_transaction(self) -> None:
+        # Deterministic normal-pattern transaction — no graph/Fraud DNA evidence.
+        txn_id = "TXN-E3A14F5D6ED5855D"
+        resp = self.client.get(f"/reports/{txn_id}/pdf")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.headers["content-type"], "application/pdf")
+        self.assertIn("attachment", resp.headers["content-disposition"])
+        self.assertIn(f"report-{txn_id}.pdf", resp.headers["content-disposition"])
+        self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_report_pdf_download_for_ring_transaction_with_graph_and_dna(self) -> None:
+        # Deterministic ring-pattern transaction — has graph evidence and,
+        # via the seeded Fraud DNA library, a match too.
+        txn_id = "TXN-AF493E2FCD007CAD"
+        resp = self.client.get(f"/reports/{txn_id}/pdf")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.headers["content-type"], "application/pdf")
+        self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_report_pdf_404_for_unknown_txn(self) -> None:
+        resp = self.client.get("/reports/TXN-DOES-NOT-EXIST/pdf")
+        self.assertEqual(resp.status_code, 404)
+
     def test_decision_submit_and_audit_round_trip(self) -> None:
         txn_id = self.client.get("/transactions/recent?limit=1").json()["transactions"][0]["txn_id"]
         self.client.get(f"/cases/{txn_id}")  # ensure a case exists
