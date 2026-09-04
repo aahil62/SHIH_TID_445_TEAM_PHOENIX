@@ -178,6 +178,21 @@ class AuditEvent(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+# ── Regulatory context (populated by main in Stage C) ────────────────────
+#
+# Reference-only mapping to real Indian regulatory frameworks (RBI, PMLA,
+# CERT-In) — see fraudlens/core/compliance/regulatory_matrix.py. Never a
+# record of an actual filing: FraudLens does not submit anything to RBI,
+# FIU-IND, or CERT-In. `hedge` always carries the "typically reportable
+# under..." framing so a report can't be misread as a compliance action log.
+
+class RegulatoryReference(BaseModel):
+    framework: str
+    citation: str
+    relevance: str
+    hedge: str
+
+
 # ── Report (populated by main in Stage B) ────────────────────────────────
 
 class FraudReport(BaseModel):
@@ -196,6 +211,8 @@ class FraudReport(BaseModel):
     graph_evidence: Optional[GraphEvidence] = None
     fraud_dna_match: Optional[FraudDNAMatch] = None
     recommended_action: str
+    system_action: Optional[str] = None
+    regulatory_context: list[RegulatoryReference] = Field(default_factory=list)
     report_status: str = "draft"
     generated_at: str = Field(default_factory=_now_iso)
     report_text: str = ""

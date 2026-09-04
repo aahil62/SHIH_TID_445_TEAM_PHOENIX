@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from fraudlens.core.compliance.regulatory_matrix import get_regulatory_context
 from fraudlens.core.privacy import mask_identifier, mask_ip
 from fraudlens.models.schemas import AnalystDecision, FraudCase, FraudReport
 
@@ -23,7 +24,13 @@ class ReportGenerator:
         analyst_decision: Optional[AnalystDecision] = None,
         report_status: str = "draft",
     ) -> FraudReport:
-        report_text = self._build_markdown(case, analyst_decision, report_status)
+        fraud_type = (
+            case.fraud_dna_match.fraud_type
+            if case.fraud_dna_match
+            else case.transaction.fraud_pattern_type
+        )
+        regulatory_context = get_regulatory_context(case.decision, fraud_type)
+        report_text = self._build_markdown(case, analyst_decision, report_status, regulatory_context)
         return FraudReport(
             report_id=f"RPT-{case.case_id}",
             case_id=case.case_id,
@@ -40,6 +47,8 @@ class ReportGenerator:
             graph_evidence=case.graph_evidence,
             fraud_dna_match=case.fraud_dna_match,
             recommended_action=case.recommended_action,
+            system_action=case.system_action,
+            regulatory_context=regulatory_context,
             report_status=report_status,
             report_text=report_text,
         )
@@ -49,6 +58,7 @@ class ReportGenerator:
         case: FraudCase,
         analyst_decision: Optional[AnalystDecision],
         report_status: str,
+        regulatory_context: list,
     ) -> str:
         engine_badge = _BADGES.get(case.decision.value, case.decision.value.upper())
         analyst_badge = _BADGES.get(analyst_decision.decision, analyst_decision.decision.upper()) if analyst_decision else "PENDING"
@@ -108,6 +118,29 @@ class ReportGenerator:
                 f"| **Matched pattern** | `{dna.matched_ring_id}` ({dna.fraud_type}) |\n\n"
                 f"**Modus operandi:** {dna.modus_operandi}\n\n"
                 f"**Recommendation:** {dna.recommendation}"
+            )
+
+        if case.system_action:
+            sections.append(
+                f"## Autonomous Action\n\n"
+                f"This case was automatically **held pending review** — final score, model "
+                f"agreement confidence, and (where applicable) the Fraud DNA match all cleared "
+                f"the autonomous-action thresholds together. This is a hold, not a block: no "
+                f"real transaction was stopped, and an analyst decision on this case reverses "
+                f"it immediately. See the audit trail (`event_type=autonomous_action`) for the "
+                f"exact scores that triggered it."
+            )
+
+        if regulatory_context:
+            sections.append(
+                "## Regulatory Context (Reference Only)\n\n"
+                "The following is background context for the reviewing analyst, not a record "
+                "of any actual regulatory filing or notification — FraudLens does not submit "
+                "anything to the RBI, FIU-IND, or CERT-In.\n\n"
+                + "\n\n".join(
+                    f"**{ref.framework}** (`{ref.citation}`)\n\n{ref.hedge}"
+                    for ref in regulatory_context
+                )
             )
 
         sections.append(f"## Recommended Action\n\n{case.recommended_action}")
