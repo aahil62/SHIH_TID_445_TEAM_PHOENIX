@@ -78,22 +78,53 @@ export default async function CasePage({
         CASE INVESTIGATION
       </h1>
 
+      {/* DECISION — pinned above the evidence, not buried after it. An
+          analyst opening this page sees the recommendation and the
+          decision controls first, and this bar stays on screen (sticky)
+          while they scroll through the evidence below, so acting on a
+          decision never requires scrolling back up. */}
+      <div
+        className="panel-fade-in sticky top-0 z-10 mb-4 rounded-[var(--radius-panel)] border px-5 py-3.5 backdrop-blur-2xl"
+        style={{
+          borderColor: tone.fg,
+          backgroundColor: "var(--panel-solid)",
+          boxShadow: "var(--shadow-panel-raised)",
+        }}
+      >
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span
+            className="rounded-[var(--radius-control)] px-2 py-0.5 text-xs font-bold tracking-wide"
+            style={{ backgroundColor: tone.bg, color: tone.fg }}
+          >
+            {RISK_TIER_LABEL[caseDetail.decision]}
+          </span>
+          {caseDetail.system_action === "auto_held" && (
+            <span
+              className="rounded-[var(--radius-control)] px-2 py-0.5 text-[11px] font-bold tracking-wide"
+              style={{ backgroundColor: "var(--risk-medium-bg)", color: "var(--risk-medium)" }}
+              title="Held automatically pending review — no real transaction was stopped. Clears the instant an analyst records a decision."
+            >
+              AUTO-HELD
+            </span>
+          )}
+          <span className="font-mono text-sm font-semibold">{formatAmount(transaction.amount)}</span>
+          <span className="text-xs" style={{ color: "var(--muted)" }}>
+            {formatScore(caseDetail.final_score)} risk score · {formatScore(caseDetail.confidence)} confidence
+          </span>
+        </div>
+        <p className="mt-2 mb-3 text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
+          {caseDetail.recommended_action}
+        </p>
+        <DecisionForm txnId={caseDetail.txn_id} currentDecision={caseDetail.decision} compact />
+      </div>
+
       <div className="flex flex-col gap-4">
         {/* 1. CASE SUMMARY */}
-        <Panel title="Case summary" accent={tone.fg} raised>
+        <Panel title="Case summary" accent={tone.fg}>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-bold tracking-wide" style={{ color: tone.fg }}>
               {RISK_TIER_LABEL[caseDetail.decision]}
             </span>
-            {caseDetail.system_action === "auto_held" && (
-              <span
-                className="rounded-[var(--radius-control)] px-2 py-0.5 text-[11px] font-bold tracking-wide"
-                style={{ backgroundColor: "var(--risk-medium-bg)", color: "var(--risk-medium)" }}
-                title="Held automatically pending review — no real transaction was stopped. Clears the instant an analyst records a decision."
-              >
-                AUTO-HELD
-              </span>
-            )}
             <span className="font-mono text-sm font-semibold">
               {formatAmount(transaction.amount)} transaction
             </span>
@@ -112,9 +143,6 @@ export default async function CasePage({
             </span>
             <span className="font-mono">{formatTimestamp(transaction.timestamp)}</span>
           </div>
-          <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--foreground)" }}>
-            {caseDetail.recommended_action}
-          </p>
         </Panel>
 
         {/* 2. WHY THIS WAS FLAGGED */}
@@ -173,6 +201,15 @@ export default async function CasePage({
             </p>
           )}
           <FraudRingGraph graph={caseGraph} />
+          {graph_evidence?.ring_id && (
+            <Link
+              href={`/network?ring=${encodeURIComponent(graph_evidence.ring_id)}#ring-${encodeURIComponent(graph_evidence.ring_id)}`}
+              className="mt-3 inline-block text-xs font-medium underline-offset-2 hover:underline"
+              style={{ color: "var(--amber)" }}
+            >
+              View this ring on Fraud Network →
+            </Link>
+          )}
         </Panel>
 
         {/* 5. FRAUD DNA — only real content when present, explicit empty state when not */}
