@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fraudlens.core.privacy import mask_identifier, mask_ip
+from fraudlens.core.reports.pdf_generator import build_case_report_pdf
 from fraudlens.models.schemas import AnalystDecision, FraudCase, FraudReport
 
 _BADGES = {
@@ -43,6 +44,16 @@ class ReportGenerator:
             report_status=report_status,
             report_text=report_text,
         )
+
+    def generate_pdf(
+        self,
+        case: FraudCase,
+        analyst_decision: Optional[AnalystDecision] = None,
+    ) -> bytes:
+        """A real laid-out PDF built straight from the case — same inputs
+        as generate()/_build_markdown, not a rendering of the markdown
+        text. See fraudlens/core/reports/pdf_generator.py."""
+        return build_case_report_pdf(case, analyst_decision=analyst_decision)
 
     def _build_markdown(
         self,

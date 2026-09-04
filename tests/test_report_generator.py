@@ -6,6 +6,8 @@ from fraudlens.models.schemas import (
     AnalystDecision,
     Decision,
     FraudCase,
+    FraudDNAMatch,
+    FraudDNAProfile,
     GraphEvidence,
     Transaction,
 )
@@ -70,6 +72,66 @@ class ReportGeneratorTests(unittest.TestCase):
     def test_report_omits_dna_section_when_no_match(self) -> None:
         report = self.generator.generate(_sample_case())
         self.assertNotIn("Fraud DNA Match", report.report_text)
+
+    def test_generate_pdf_returns_a_real_pdf(self) -> None:
+        pdf_bytes = self.generator.generate_pdf(_sample_case())
+        self.assertIsInstance(pdf_bytes, bytes)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+        self.assertGreater(len(pdf_bytes), 500)
+
+    def test_generate_pdf_works_without_graph_or_dna_evidence(self) -> None:
+        case = _sample_case()
+        case.graph_evidence = None
+        pdf_bytes = self.generator.generate_pdf(case)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    def test_generate_pdf_works_with_fraud_dna_match(self) -> None:
+        case = _sample_case()
+        case.fraud_dna_match = FraudDNAMatch(
+            matched_ring_id="SEED-01",
+            similarity_score=0.82,
+            fraud_type="card_testing",
+            modus_operandi="rapid small transactions",
+            recommendation="Escalate immediately.",
+            matched_profile=FraudDNAProfile(
+                ring_id="SEED-01", ring_size=4, shared_devices=2, shared_ips=1,
+                avg_amount=5000.0, max_amount=9000.0, merchant_category_count=2,
+                velocity_score=0.7, graph_density=0.5, fraud_type="card_testing",
+                modus_operandi="rapid small transactions", first_detected="2026-01-01T00:00:00+00:00",
+            ),
+        )
+        pdf_bytes = self.generator.generate_pdf(case)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    def test_generate_pdf_works_with_analyst_decision(self) -> None:
+        decision = AnalystDecision(
+            id=1, case_id="CASE-TXN-RPT-001", txn_id="TXN-RPT-001",
+            decision="review", analyst="jane", notes="Downgrading pending call",
+            decided_at="2026-09-03T15:00:00+00:00", is_override=True,
+        )
+        pdf_bytes = self.generator.generate_pdf(_sample_case(), analyst_decision=decision)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    def test_generate_pdf_works_with_no_agent_scores(self) -> None:
+        case = _sample_case()
+        case.agent_scores = []
+        pdf_bytes = self.generator.generate_pdf(case)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+    def test_generate_pdf_handles_rupee_symbol_in_reason_strings(self) -> None:
+        # Regression: rule_agent's real reason strings contain a literal ₹
+        # (e.g. "Amount ₹342,829.13 exceeds..."), which fpdf2's core font
+        # can't encode directly — this must not raise, and shouldn't
+        # silently degrade to a bare "?" either.
+        case = _sample_case()
+        case.agent_scores = [
+            AgentScore(
+                agent_name="rule_agent", score=0.95, confidence=0.9,
+                reasons=["Amount ₹342,829.13 exceeds minor threshold (₹150,000)"],
+            )
+        ]
+        pdf_bytes = self.generator.generate_pdf(case)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
 
 
 if __name__ == "__main__":
