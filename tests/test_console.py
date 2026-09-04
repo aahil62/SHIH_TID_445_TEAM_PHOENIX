@@ -118,6 +118,41 @@ class ConsoleApiTests(unittest.TestCase):
         self.assertEqual(row["status"], "BLOCK")
         self.assertEqual(row["analyst"], "reports-test-analyst")
 
+    def test_reports_list_shows_false_positive_status_distinctly(self) -> None:
+        # A confirmed false positive must read differently from a routine
+        # CLEAR status — this case was actually flagged and investigated,
+        # not a transaction that was always fine.
+        txn_id = "TXN-AF493E2FCD007CAD"  # deterministic block_and_report ring transaction
+        self.client.get(f"/cases/{txn_id}")
+        self.client.post("/decisions", json={
+            "txn_id": txn_id, "decision": "clear", "analyst": "console-fp-analyst",
+            "is_false_positive": True,
+        })
+        rows = self.client.get("/reports?limit=2000").json()["rows"]
+        row = next(r for r in rows if r["txn_id"] == txn_id)
+        self.assertEqual(row["status"], "FALSE POSITIVE")
+        self.assertNotEqual(row["status"], "CLEAR")
+        self.assertEqual(row["analyst"], "console-fp-analyst")
+
+    def test_global_audit_reflects_a_false_positive_correction_distinctly(self) -> None:
+        txn_id = "TXN-AF493E2FCD007CAD"
+        self.client.get(f"/cases/{txn_id}")
+        self.client.post("/decisions", json={
+            "txn_id": txn_id, "decision": "clear", "analyst": "audit-fp-analyst",
+            "is_false_positive": True,
+        })
+        events = self.client.get("/audit?limit=200").json()["events"]
+        matching = [
+            e for e in events
+            if e["txn_id"] == txn_id and e["event_type"] == "analyst_decision"
+            and "false positive" in e["text"].lower()
+        ]
+        self.assertTrue(matching)
+        self.assertIn("audit-fp-analyst", matching[0]["text"])
+        # Not the generic "recorded decision: CLEAR" phrasing an ordinary
+        # clear decision would get.
+        self.assertNotIn("recorded decision", matching[0]["text"].lower())
+
     def test_network_summary_finds_a_known_ring(self) -> None:
         resp = self.client.get("/network/summary")
         self.assertEqual(resp.status_code, 200)

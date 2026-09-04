@@ -13,7 +13,12 @@ router = APIRouter(prefix="/cases", tags=["cases"])
 @router.get("")
 def list_cases() -> dict:
     runtime = state.runtime
-    return {"cases": [public_case(c) for c in runtime.engine.list_cases()]}
+    cases = runtime.engine.list_cases()
+    return {
+        "cases": [
+            public_case(c, runtime.decision_workflow.get_decision(c.case_id)) for c in cases
+        ]
+    }
 
 
 @router.get("/{txn_id}")
@@ -23,7 +28,8 @@ def get_case(txn_id: str) -> dict:
         case = runtime.analyze(txn_id)
     except ValueError:
         raise HTTPException(status_code=404, detail=f"Transaction {txn_id} not found")
-    return public_case(case)
+    decision = runtime.decision_workflow.get_decision(case.case_id)
+    return public_case(case, decision)
 
 
 @router.get("/{txn_id}/graph")

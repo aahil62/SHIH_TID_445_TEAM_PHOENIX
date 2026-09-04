@@ -16,6 +16,7 @@ class DecisionRequest(BaseModel):
     decision: str
     analyst: Optional[str] = None
     notes: Optional[str] = None
+    is_false_positive: bool = False
 
 
 @router.post("")
@@ -31,6 +32,7 @@ def submit_decision(payload: DecisionRequest) -> dict:
     try:
         record = runtime.decision_workflow.submit_decision(
             case, payload.decision, analyst=payload.analyst, notes=payload.notes,
+            is_false_positive=payload.is_false_positive,
         )
     except DecisionWorkflowError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -39,7 +41,14 @@ def submit_decision(payload: DecisionRequest) -> dict:
     # validated fraud — grow the Fraud DNA library from it. Unconfirmed
     # engine-only detections never feed the library; only analyst-reviewed
     # ones do, so it doesn't fill up with unreviewed false positives.
-    if payload.decision in ("block", "block_and_report"):
+    #
+    # `not payload.is_false_positive` is belt-and-suspenders: submit_decision()
+    # above already rejects is_false_positive=True paired with anything but
+    # decision="clear", so this branch (block/block_and_report) can never
+    # actually be reached with is_false_positive set. Kept anyway as a second,
+    # independent barrier on the one path that must never be wrong — see
+    # tests/test_confirm_fraud_dna.py for the direct proof.
+    if payload.decision in ("block", "block_and_report") and not payload.is_false_positive:
         runtime.engine.confirm_fraud_dna(payload.txn_id)
 
     return record.model_dump()
