@@ -20,6 +20,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from fraudlens.core.auth.store import AnalystStore
+from fraudlens.core.cases.account_restriction import AccountRestrictionStore
 from fraudlens.core.cases.case_engine import CaseEngine
 from fraudlens.core.cases.decision_workflow import DecisionWorkflow
 from fraudlens.core.copilot.agent import ChosenTool, CopilotAgent, CopilotError, CopilotTools
@@ -99,7 +101,15 @@ class _CopilotFixture(unittest.TestCase):
         self._decisions_tmp.close()
         self._audit_tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
         self._audit_tmp.close()
-        for path in (self._cases_tmp.name, self._dna_tmp.name, self._decisions_tmp.name, self._audit_tmp.name):
+        self._analysts_tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        self._analysts_tmp.close()
+        os.remove(self._analysts_tmp.name)  # let AnalystStore auto-seed it
+        self._restrictions_tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        self._restrictions_tmp.close()
+        for path in (
+            self._cases_tmp.name, self._dna_tmp.name, self._decisions_tmp.name,
+            self._audit_tmp.name, self._analysts_tmp.name, self._restrictions_tmp.name,
+        ):
             self.addCleanup(lambda p=path: os.path.exists(p) and os.remove(p))
 
         self.ring_txns = _card_testing_ring_txns()
@@ -122,6 +132,8 @@ class _CopilotFixture(unittest.TestCase):
             report_generator=ReportGenerator(),
             transactions=transactions,
             dna_store=FraudDNAStore(path=self._dna_tmp.name),
+            analyst_store=AnalystStore(path=self._analysts_tmp.name),
+            account_restriction_store=AccountRestrictionStore(path=self._restrictions_tmp.name),
         )
         self.tools = CopilotTools(self.runtime)
 

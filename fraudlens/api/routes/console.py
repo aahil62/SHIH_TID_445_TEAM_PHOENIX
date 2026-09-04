@@ -97,6 +97,8 @@ def get_dashboard() -> dict[str, Any]:
         for name, scores in sorted(agent_totals.items())
     ]
 
+    restricted_accounts = sum(1 for r in runtime.account_restriction_store.all() if r.is_active)
+
     return {
         "critical_alerts": critical_alerts,
         "pending_reviews": pending_reviews,
@@ -104,6 +106,7 @@ def get_dashboard() -> dict[str, Any]:
         "investigations": investigations,
         "fraud_rings": len(ring_ids),
         "transactions_analyzed": len(cases),
+        "restricted_accounts": restricted_accounts,
         "risk_trend": risk_trend,
         "agent_averages": agent_averages,
     }
@@ -184,6 +187,12 @@ def _describe_event(event: AuditEvent) -> tuple[str, str]:
         else:
             text = f"{analyst} recorded decision: {decision}"
         return text, _DECISION_TONE.get(meta.get("decision", ""), "blue")
+    if event.event_type == "account_restriction_applied":
+        hint = meta.get("account_id_masked_hint", "")
+        return f"System tightened velocity limits on account ••{hint} (auto-applied)", "amber"
+    if event.event_type == "account_restriction_released":
+        hint = meta.get("account_id_masked_hint", "")
+        return f"{event.actor} lifted the velocity restriction on account ••{hint}", "green"
     return event.event_type.replace("_", " ").title(), "blue"
 
 

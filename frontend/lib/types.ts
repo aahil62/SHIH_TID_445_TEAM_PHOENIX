@@ -70,13 +70,17 @@ export interface Case {
    * pending review — never a claim that a real transaction was stopped.
    * Cleared the instant an analyst records any decision. */
   system_action: string | null;
+  /** True while this transaction's account is under the autonomous
+   * velocity restriction that follows an auto-held case — a real,
+   * forward-looking consequence, not just a label. Cleared the instant an
+   * analyst records a decision on the case that triggered it. */
+  account_restricted: boolean;
   created_at: string;
 }
 
 export interface DecisionSubmission {
   txn_id: string;
   decision: Decision;
-  analyst?: string;
   notes?: string;
 }
 
@@ -167,6 +171,7 @@ export interface DashboardStats {
   investigations: number;
   fraud_rings: number;
   transactions_analyzed: number;
+  restricted_accounts: number;
   risk_trend: { date: string; avg_score: number; count: number }[];
   agent_averages: { agent_name: string; avg_score: number }[];
 }
@@ -221,6 +226,19 @@ export interface NetworkSummary {
   shared_ips: number;
   top_dna_match_pct: number | null;
   rings: NetworkRing[];
+}
+
+// ── Auth (POST /auth/login, /auth/signup, GET /auth/me) ─────────────────
+
+export interface AnalystProfile {
+  username: string;
+  display_name: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  analyst: AnalystProfile;
 }
 
 // ── Copilot (POST /copilot/chat) ────────────────────────────────────────────

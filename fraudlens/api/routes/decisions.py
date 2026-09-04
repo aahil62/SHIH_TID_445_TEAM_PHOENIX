@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from fraudlens.api.deps import get_current_analyst
 from fraudlens.api.state import state
+from fraudlens.core.cases.autonomous_action import AUTO_HOLD_ACTION
 from fraudlens.core.cases.decision_workflow import DecisionWorkflowError
+from fraudlens.models.schemas import AnalystProfile
 
 router = APIRouter(prefix="/decisions", tags=["decisions"])
 
@@ -14,12 +17,16 @@ router = APIRouter(prefix="/decisions", tags=["decisions"])
 class DecisionRequest(BaseModel):
     txn_id: str
     decision: str
-    analyst: Optional[str] = None
     notes: Optional[str] = None
 
 
 @router.post("")
-def submit_decision(payload: DecisionRequest) -> dict:
+def submit_decision(
+    payload: DecisionRequest, current: AnalystProfile = Depends(get_current_analyst)
+) -> dict:
+    """Requires a logged-in analyst — the `analyst` field on the resulting
+    record is the authenticated identity, never client-supplied free text
+    (that was the actual gap: previously anyone could claim to be anyone)."""
     runtime = state.runtime
     case = runtime.engine.get_case_by_txn(payload.txn_id)
     if case is None:
@@ -28,9 +35,12 @@ def submit_decision(payload: DecisionRequest) -> dict:
         except ValueError:
             raise HTTPException(status_code=404, detail=f"Transaction {payload.txn_id} not found")
 
+    was_auto_held = case.system_action == AUTO_HOLD_ACTION
+    account_id = case.transaction.account_id
+
     try:
         record = runtime.decision_workflow.submit_decision(
-            case, payload.decision, analyst=payload.analyst, notes=payload.notes,
+            case, payload.decision, analyst=current.display_name, notes=payload.notes,
         )
     except DecisionWorkflowError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -41,6 +51,17 @@ def submit_decision(payload: DecisionRequest) -> dict:
     # ones do, so it doesn't fill up with unreviewed false positives.
     if payload.decision in ("block", "block_and_report"):
         runtime.engine.confirm_fraud_dna(payload.txn_id)
+
+    # Second half of the reversal, mirroring the case-level auto-hold
+    # reversal DecisionWorkflow already performs: a human deciding on the
+    # triggering case also lifts the account-level velocity restriction —
+    # the account is never left permanently constrained without a human
+    # able to release it.
+    if was_auto_held and case.system_action is None:
+        runtime.account_restriction_store.release(account_id, current.display_name)
+        runtime.decision_workflow.record_account_restriction_released(
+            case, account_id, current.display_name
+        )
 
     return record.model_dump()
 

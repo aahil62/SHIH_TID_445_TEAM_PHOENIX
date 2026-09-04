@@ -1,4 +1,5 @@
 import type {
+  AnalystProfile,
   AuditLogEvent,
   Case,
   CaseGraphResponse,
@@ -38,10 +39,17 @@ export function getCase(txnId: string) {
   return apiFetch<Case>(`/cases/${txnId}`);
 }
 
-export function submitDecision(payload: DecisionSubmission) {
+/** Requires a logged-in analyst's token — the backend rejects this with
+ * 401 without one, and the `analyst` on the resulting record comes from
+ * that authenticated session, never anything sent here. Takes the token
+ * as a parameter (rather than reading localStorage itself) so this module
+ * stays free of browser-only APIs and safe to import from both server and
+ * client components, same as every other function here. */
+export function submitDecision(payload: DecisionSubmission, token: string) {
   return apiFetch<{ status?: string }>(`/decisions`, {
     method: "POST",
     body: JSON.stringify(payload),
+    headers: { Authorization: `Bearer ${token}` },
   });
 }
 
@@ -87,6 +95,10 @@ export function getReports(limit = 50) {
 
 export function getNetworkSummary() {
   return apiFetch<NetworkSummary>(`/network/summary`);
+}
+
+export function getCurrentAnalyst(token: string) {
+  return apiFetch<AnalystProfile>(`/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
 }
 
 /** Carries the real HTTP status and the backend's own `detail` message —
