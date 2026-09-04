@@ -192,6 +192,34 @@ class DecisionWorkflow:
             case.case_id, case.txn_id, "autonomous_action", "system", metadata
         )
 
+    def record_account_restriction_applied(self, case: FraudCase, account_id: str) -> Optional[AuditEvent]:
+        """Log the account-level velocity restriction as its own distinct
+        event, separate from "autonomous_action" (the case-level hold) —
+        this one is about the account, and its effect on future
+        transactions is what makes autonomy in this system a real action,
+        not just a label. Idempotent per case, same pattern as
+        record_autonomous_action."""
+        if any(
+            e.case_id == case.case_id and e.event_type == "account_restriction_applied"
+            for e in self._audit_events
+        ):
+            return None
+        return self._log_event(
+            case.case_id, case.txn_id, "account_restriction_applied", "system",
+            {"account_id_masked_hint": account_id[-4:] if len(account_id) >= 4 else account_id},
+        )
+
+    def record_account_restriction_released(
+        self, case: FraudCase, account_id: str, released_by: str
+    ) -> AuditEvent:
+        """Logged the moment a human reverses the case that triggered the
+        restriction — always reversible by a human, exactly like the
+        case-level auto-hold."""
+        return self._log_event(
+            case.case_id, case.txn_id, "account_restriction_released", released_by,
+            {"account_id_masked_hint": account_id[-4:] if len(account_id) >= 4 else account_id},
+        )
+
     def get_decision(self, case_id: str) -> Optional[AnalystDecision]:
         return self._decisions.get(case_id)
 

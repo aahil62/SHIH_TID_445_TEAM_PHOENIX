@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fraudlens.api.routes.auth import router as auth_router
 from fraudlens.api.routes.cases import router as cases_router
 from fraudlens.api.routes.console import router as console_router
 from fraudlens.api.routes.copilot import router as copilot_router
@@ -51,6 +52,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(health_router)
 app.include_router(transactions_router)
 app.include_router(cases_router)

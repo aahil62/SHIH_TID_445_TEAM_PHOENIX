@@ -84,15 +84,25 @@ class ApiTests(unittest.TestCase):
         resp = self.client.get("/reports/TXN-DOES-NOT-EXIST/pdf")
         self.assertEqual(resp.status_code, 404)
 
+    def _auth_headers(self) -> dict:
+        login = self.client.post("/auth/login", json={"username": "asharma", "password": "fraudlens123"})
+        token = login.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
     def test_decision_submit_and_audit_round_trip(self) -> None:
         txn_id = self.client.get("/transactions/recent?limit=1").json()["transactions"][0]["txn_id"]
         self.client.get(f"/cases/{txn_id}")  # ensure a case exists
 
-        resp = self.client.post("/decisions", json={
-            "txn_id": txn_id, "decision": "review", "analyst": "test-analyst", "notes": "checking in",
-        })
+        resp = self.client.post(
+            "/decisions",
+            json={"txn_id": txn_id, "decision": "review", "notes": "checking in"},
+            headers=self._auth_headers(),
+        )
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["analyst"], "test-analyst")
+        # The analyst name now comes from the authenticated session (see
+        # tests/test_auth.py for the full auth-flow coverage), not
+        # client-supplied text.
+        self.assertEqual(resp.json()["analyst"], "A. Sharma")
 
         audit_resp = self.client.get(f"/decisions/{txn_id}/audit")
         self.assertEqual(audit_resp.status_code, 200)
@@ -102,8 +112,17 @@ class ApiTests(unittest.TestCase):
     def test_decision_rejects_invalid_value(self) -> None:
         txn_id = self.client.get("/transactions/recent?limit=1").json()["transactions"][0]["txn_id"]
         self.client.get(f"/cases/{txn_id}")
-        resp = self.client.post("/decisions", json={"txn_id": txn_id, "decision": "not_a_real_decision"})
+        resp = self.client.post(
+            "/decisions",
+            json={"txn_id": txn_id, "decision": "not_a_real_decision"},
+            headers=self._auth_headers(),
+        )
         self.assertEqual(resp.status_code, 400)
+
+    def test_decision_without_auth_is_rejected(self) -> None:
+        txn_id = self.client.get("/transactions/recent?limit=1").json()["transactions"][0]["txn_id"]
+        resp = self.client.post("/decisions", json={"txn_id": txn_id, "decision": "review"})
+        self.assertEqual(resp.status_code, 401)
 
     def test_case_graph_returns_real_masked_ring_for_a_ring_transaction(self) -> None:
         # Deterministic under the fixed seed=42 synthetic dataset — a

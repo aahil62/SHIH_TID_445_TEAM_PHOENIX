@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitDecision } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import type { Decision } from "@/lib/types";
 import { DECISION_LABEL, DECISION_TONE } from "@/lib/risk";
 
@@ -19,7 +20,7 @@ export default function DecisionForm({
   const [selected, setSelected] = useState<Decision>(currentDecision);
   const [notes, setNotes] = useState("");
   const [isFalsePositive, setIsFalsePositive] = useState(false);
-  const [status, setStatus] = useState<"idle" | "error" | "success">("idle");
+  const [status, setStatus] = useState<"idle" | "error" | "success" | "unauthenticated">("idle");
   const [isPending, startTransition] = useTransition();
 
   // Only a case the engine actually flagged can be "corrected" to a false
@@ -41,14 +42,22 @@ export default function DecisionForm({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus("idle");
+    const token = getToken();
+    if (!token) {
+      setStatus("unauthenticated");
+      return;
+    }
     startTransition(async () => {
       try {
-        await submitDecision({
-          txn_id: txnId,
-          decision: selected,
-          notes: notes || undefined,
-          is_false_positive: isFalsePositive || undefined,
-        });
+        await submitDecision(
+          {
+            txn_id: txnId,
+            decision: selected,
+            notes: notes || undefined,
+            is_false_positive: isFalsePositive || undefined,
+          },
+          token,
+        );
         setStatus("success");
         router.refresh();
       } catch {
@@ -133,6 +142,15 @@ export default function DecisionForm({
           >
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
             Couldn&apos;t submit. Try again.
+          </span>
+        )}
+        {status === "unauthenticated" && (
+          <span
+            className="inline-flex items-center gap-1.5 text-xs font-medium"
+            style={{ color: "var(--risk-high)" }}
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+            You&apos;re not signed in — decisions require a logged-in analyst.
           </span>
         )}
       </div>
