@@ -145,6 +145,14 @@ class FraudCase(BaseModel):
     fraud_dna_match: Optional[FraudDNAMatch] = None
     recommended_action: str = ""
     created_at: str = Field(default_factory=_now_iso)
+    # Bounded autonomous action (see fraudlens/core/cases/autonomous_action.py).
+    # "auto_held" when the case cleared every corroborating-signal threshold
+    # at once; never a claim that a real payment was stopped. Always
+    # overridable — set back to None, with system_action_overridden_at
+    # stamped, the moment an analyst records any decision on the case via
+    # DecisionWorkflow.submit_decision().
+    system_action: Optional[str] = None
+    system_action_overridden_at: Optional[str] = None
 
 
 # ── Analyst workflow (populated by feature/graph-behavioral in Stage B) ─────

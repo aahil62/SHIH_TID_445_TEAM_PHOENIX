@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 
+from fraudlens.core.cases.autonomous_action import evaluate_autonomous_action
 from fraudlens.core.dna.agent import score_fraud_dna
 from fraudlens.core.dna.extractor import FraudDNAExtractor
 from fraudlens.core.dna.matcher import FraudDNAMatcher
@@ -94,8 +95,9 @@ class CaseEngine:
         agent_scores = [agent.score(txn) for agent in self._agents] + [dna_agent_score]
         result = self._ensemble.combine(agent_scores)
 
+        case_id = f"CASE-{txn_id}"
         case = FraudCase(
-            case_id=f"CASE-{txn_id}",
+            case_id=case_id,
             txn_id=txn_id,
             transaction=txn,
             final_score=result.final_score,
@@ -107,7 +109,21 @@ class CaseEngine:
             fraud_dna_match=fraud_dna_match,
             recommended_action=self._recommended_action(result.decision, fraud_dna_match),
         )
-        self._cases[case.case_id] = case
+
+        # analyze() rebuilds the case from scratch every call (GET
+        # /cases/{txn_id} re-runs it on every request), so a bare
+        # evaluate_autonomous_action() call here would silently resurrect
+        # an auto-hold a human already reversed via submit_decision(). Once
+        # overridden, it stays overridden for the life of this case —
+        # carry that forward from whatever was already on record instead of
+        # recomputing it.
+        existing = self._cases.get(case_id)
+        if existing is not None and existing.system_action_overridden_at is not None:
+            case.system_action_overridden_at = existing.system_action_overridden_at
+        else:
+            case.system_action = evaluate_autonomous_action(case)
+
+        self._cases[case_id] = case
         self._persist_cases()
         return case
 

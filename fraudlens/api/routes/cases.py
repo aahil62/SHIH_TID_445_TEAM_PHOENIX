@@ -20,7 +20,7 @@ def list_cases() -> dict:
 def get_case(txn_id: str) -> dict:
     runtime = state.runtime
     try:
-        case = runtime.engine.analyze(txn_id)
+        case = runtime.analyze(txn_id)
     except ValueError:
         raise HTTPException(status_code=404, detail=f"Transaction {txn_id} not found")
     return public_case(case)
@@ -33,7 +33,7 @@ def get_case_graph(txn_id: str) -> dict:
     convention as `graph_evidence` being null on the case itself."""
     runtime = state.runtime
     try:
-        runtime.engine.analyze(txn_id)  # ensures the transaction is valid, same 404 as /cases/{txn_id}
+        runtime.analyze(txn_id)  # ensures the transaction is valid, same 404 as /cases/{txn_id}
     except ValueError:
         raise HTTPException(status_code=404, detail=f"Transaction {txn_id} not found")
 

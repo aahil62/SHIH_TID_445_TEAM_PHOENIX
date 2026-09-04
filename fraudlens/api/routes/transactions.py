@@ -17,7 +17,7 @@ def recent(limit: int = Query(25, ge=1, le=200)) -> dict:
 
     summaries = []
     for txn in txns:
-        case = runtime.engine.analyze(txn.txn_id)
+        case = runtime.analyze(txn.txn_id)
         summaries.append({
             "txn_id": case.txn_id,
             "account_id": mask_identifier(txn.account_id),
