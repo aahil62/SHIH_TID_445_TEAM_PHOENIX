@@ -176,7 +176,10 @@ export default function ConsoleShell({ children }: { children: React.ReactNode }
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-sm font-medium transition-colors"
+                className={
+                  "flex items-center gap-2.5 rounded-[var(--radius-control)] px-2.5 py-2 text-sm font-medium transition-colors" +
+                  (active ? "" : " hover:bg-white/[0.04] hover:text-foreground")
+                }
                 style={{
                   backgroundColor: active ? "rgba(22,163,106,0.16)" : "transparent",
                   boxShadow: active ? "inset 2px 0 0 var(--cobalt)" : undefined,

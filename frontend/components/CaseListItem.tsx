@@ -17,7 +17,7 @@ export default function CaseListItem({ item }: { item: Case }) {
   return (
     <Link
       href={`/case?txn_id=${encodeURIComponent(item.txn_id)}`}
-      className="block rounded-[var(--radius-panel)] border px-4 py-3 transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+      className="panel-fade-in hoverable-row block rounded-[var(--radius-panel)] border px-4 py-3 backdrop-blur-xl transition-[background-color,border-color]"
       style={{
         borderColor: "var(--border)",
         backgroundColor: "var(--panel)",

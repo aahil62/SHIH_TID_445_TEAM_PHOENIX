@@ -94,3 +94,40 @@ select:focus-visible,
   outline-offset: 2px;
   border-radius: var(--radius-control);
 }
+
+/* Restrained entrance for panels as real data resolves — server-rendered
+   content pops in without this, which reads as a template flash rather
+   than a console that just finished pulling live data. Skipped entirely
+   for users who've asked for less motion. */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel-fade-in {
+  animation: panel-in 0.32s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-fade-in {
+    animation: none;
+  }
+}
+
+/* Hover feedback that reads from the same tokens as the static state,
+   for any glass surface that's actually clickable (stat-card links,
+   list rows) — inline styles can't express :hover, so this is the one
+   place a hover rule lives outside a component's own style prop. */
+.hoverable-panel:hover {
+  border-color: var(--cobalt);
+}
+
+.hoverable-row:hover {
+  background-color: rgba(180, 220, 200, 0.05);
+}

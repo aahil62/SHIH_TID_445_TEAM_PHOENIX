@@ -32,7 +32,7 @@ export default async function ReportsPage() {
                 className="border-b text-left text-[10.5px] font-semibold uppercase tracking-wider"
                 style={{ borderColor: "var(--border)", color: "var(--muted)" }}
               >
-                <th className="py-2 pr-3">Transaction</th>
+                <th className="py-2 pr-3 pl-2">Transaction</th>
                 <th className="py-2 pr-3">Risk</th>
                 <th className="py-2 pr-3">Status</th>
                 <th className="py-2 pr-3">Analyst</th>
@@ -42,8 +42,15 @@ export default async function ReportsPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.txn_id} className="border-b" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
-                  <td className="py-2.5 pr-3 font-mono text-xs" style={{ color: "var(--foreground)" }}>
+                <tr
+                  key={r.txn_id}
+                  className="hoverable-row border-b transition-colors"
+                  style={{
+                    borderColor: "rgba(255,255,255,0.05)",
+                    borderLeft: r.tone === "red" ? "2px solid var(--risk-high)" : "2px solid transparent",
+                  }}
+                >
+                  <td className="py-2.5 pr-3 pl-2 font-mono text-xs" style={{ color: "var(--foreground)" }}>
                     {r.txn_id}
                   </td>
                   <td className="py-2.5 pr-3 font-mono text-xs font-semibold" style={{ color: TONE_COLOR[r.tone] }}>
@@ -53,7 +60,11 @@ export default async function ReportsPage() {
                   <td className="py-2.5 pr-3 text-xs" style={{ color: "var(--muted)" }}>{r.analyst}</td>
                   <td className="py-2.5 pr-3 text-xs" style={{ color: "var(--muted)" }}>{r.report_type}</td>
                   <td className="py-2.5 pr-3 text-right text-xs font-semibold">
-                    <Link href={`/case?txn_id=${encodeURIComponent(r.txn_id)}`} style={{ color: "var(--cobalt)" }} className="mr-3">
+                    <Link
+                      href={`/case?txn_id=${encodeURIComponent(r.txn_id)}`}
+                      style={{ color: "var(--cobalt)" }}
+                      className="mr-3 underline-offset-2 hover:underline"
+                    >
                       View
                     </Link>
                     <a
@@ -61,6 +72,7 @@ export default async function ReportsPage() {
                       target="_blank"
                       rel="noreferrer"
                       style={{ color: "var(--cobalt)" }}
+                      className="underline-offset-2 hover:underline"
                     >
                       Export PDF
                     </a>

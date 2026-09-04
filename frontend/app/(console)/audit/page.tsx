@@ -46,7 +46,7 @@ export default async function AuditPage() {
                 {e.txn_id && (
                   <Link
                     href={`/case?txn_id=${encodeURIComponent(e.txn_id)}`}
-                    className="text-[11px] font-medium"
+                    className="text-[11px] font-medium underline-offset-2 hover:underline"
                     style={{ color: "var(--cobalt)" }}
                   >
                     {e.txn_id} →
