@@ -18,12 +18,6 @@ FraudLens doesn't just answer "is this transaction risky?" It answers: what patt
 belong to, have we seen it before, who — or what — should act on it, and under what regulatory
 framework does that action fall?
 
-## Live demo
-
-- **Console:** https://fraud-lens.vercel.app — sign in with the seeded accounts below
-- **API:** deployed on Render (see `render.yaml`); the frontend talks to it via `NEXT_PUBLIC_API_BASE`
-- Seeded accounts: `asharma` / `riyer`, password `fraudlens123`
-
 ## What it does
 
 A transaction enters the system and is independently evaluated by **six scoring agents**, each
@@ -244,9 +238,10 @@ scores, amounts, and timestamps — never mixed. Full spec in `DESIGN.md`; strat
 **Backend:** Python, FastAPI, Pydantic, scikit-learn, NetworkX, fpdf2, PyJWT
 **Frontend:** Next.js (App Router), TypeScript, Tailwind CSS, Instrument Sans + Space Mono
 **Testing:** `unittest` (backend), Vitest + React Testing Library (frontend)
-**Hosting:** frontend on Vercel, backend on Render (see Live demo below)
 
 ## Running it
+
+This is presented locally — clone and run these two commands side by side:
 
 ```bash
 # Backend
@@ -279,4 +274,4 @@ python -m fraudlens.evaluation.validate_ulb
 | Rule/velocity/ML agents, benchmark suite, PDF report export, Copilot agent, false-positive tracking, model-performance page | Mehul | [@mehul-gg](https://github.com/mehul-gg) |
 | Graph/behavioral agents, Fraud DNA, decision workflow, ring detection, fraud network graph + explorer, design system | Aditya | [@Aditya-cyber2006](https://github.com/Aditya-cyber2006) |
 | Console scaffold, alert feed, case detail page, bounded autonomous action layer, regulatory reference matrix | Unnati | [@Unnati9945](https://github.com/Unnati9945) |
-| Deployment (Render backend + Vercel frontend) | Pratik | [@pratik-dev01](https://github.com/pratik-dev01) |
+| Deployment tooling (Render + Vercel config) | Pratik | [@pratik-dev01](https://github.com/pratik-dev01) |
