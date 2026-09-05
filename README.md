@@ -267,11 +267,16 @@ curl -o fraudlens/data/external/creditcard_ulb.csv \
 python -m fraudlens.evaluation.validate_ulb
 ```
 
+## Submission
+
+- **PPT + video**: [Google Drive link](PASTE_GOOGLE_DRIVE_LINK_HERE)
+
 ## Team Phoenix
 
-| Area | Contributor |
-|---|---|
-| Architecture, core engine, integration, autonomy + compliance, console/product design | Aahil (Team Lead) |
-| Rule/velocity agents, ML model, benchmark suite | Mehul |
-| Graph/ring detection, Fraud DNA, decision workflow | Aditya |
-| Copilot, PDF report export, frontend | Unnati |
+| Area | Contributor | GitHub |
+|---|---|---|
+| Architecture, core engine integration, JWT auth, live SSE feed, account restriction, console UI/performance overhaul | Aahil (Team Lead) | [@aahil62](https://github.com/aahil62) |
+| Rule/velocity/ML agents, benchmark suite, PDF report export, Copilot agent, false-positive tracking, model-performance page | Mehul | [@mehul-gg](https://github.com/mehul-gg) |
+| Graph/behavioral agents, Fraud DNA, decision workflow, ring detection, fraud network graph + explorer, design system | Aditya | [@Aditya-cyber2006](https://github.com/Aditya-cyber2006) |
+| Console scaffold, alert feed, case detail page, bounded autonomous action layer, regulatory reference matrix | Unnati | [@Unnati9945](https://github.com/Unnati9945) |
+| Deployment (Render backend + Vercel frontend) | Pratik | [@pratik-dev01](https://github.com/pratik-dev01) |
