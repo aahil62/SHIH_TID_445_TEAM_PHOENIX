@@ -269,7 +269,7 @@ python -m fraudlens.evaluation.validate_ulb
 
 ## Submission
 
-- **PPT + video**: [Google Drive link](PASTE_GOOGLE_DRIVE_LINK_HERE)
+- **PPT + video**: [Google Drive link](https://drive.google.com/drive/folders/1a5mHBiuiDmh0zdEyWxXwydZxS7xTcTas?usp=sharing)
 
 ## Team Phoenix
 
