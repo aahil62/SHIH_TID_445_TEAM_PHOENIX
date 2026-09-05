@@ -4,6 +4,10 @@
 
 Team Phoenix · SHIH-TID-445 · Problem SH-FIN-01 · Smart Horizon 2026 Grand Finale
 
+## 📽️ Submission — PPT + Video
+
+**[Google Drive link](https://drive.google.com/drive/folders/1a5mHBiuiDmh0zdEyWxXwydZxS7xTcTas?usp=sharing)**
+
 Built for the Smart Horizon 2026 Grand Finale (03–05 Sep 2026, NHCE Bengaluru), evolving Team
 Phoenix's Level 0 and Level 1 concept — the same jury already reviewed that prototype and asked
 for more recent AI research and advanced modeling. This build answers that directly with a trained,
@@ -266,10 +270,6 @@ curl -o fraudlens/data/external/creditcard_ulb.csv \
   "https://www.openml.org/data/get_csv/1673544/phpKo8OWT"
 python -m fraudlens.evaluation.validate_ulb
 ```
-
-## Submission
-
-- **PPT + video**: [Google Drive link](https://drive.google.com/drive/folders/1a5mHBiuiDmh0zdEyWxXwydZxS7xTcTas?usp=sharing)
 
 ## Team Phoenix
 
